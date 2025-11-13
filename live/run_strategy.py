@@ -24,7 +24,7 @@ def main():
     ticker = "SPX"
     start_date = "2015-01-01"
     end_date = "2025-11-12"
-    cache_file = f"{ticker}_data.csv"
+    cache_file = f"Dataset/{ticker}_data.csv"
     # Step 1: Download data with retry
     try:
         df = download_data(ticker, start=start_date, end=end_date)
