@@ -1,0 +1,20 @@
+name: quant-paper-trading
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pandas
+  - numpy
+  - matplotlib
+  - yfinance
+  - scikit-learn
+  - statsmodels
+  - ipykernel
+  - jupyterlab
+  - black
+  - polars
+  - pip 
+  - pip:
+    - backtrader
+
+    
