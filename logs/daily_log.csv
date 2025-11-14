@@ -1,2 +1,2 @@
-Signal,Position,Return,Strategy,Date
--65.36200000000008,-1,0.0006295086181336007,-0.04114594229844846,2025-11-14
+Date,Ticker,Signal,Position,Return, StrategyReturn,CumulativeReturn ,StrategyReturn,CumulativeReturn
+2025-11-12,SPX Index,,1,0.0006295086181336007,,,0.0006295086181336007,0.4729878198996854

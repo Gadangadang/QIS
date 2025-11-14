@@ -1,33 +1,14 @@
-# backtest/backtest_mean_reversion
 import os 
 import sys 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import yfinance as yf 
 import pandas as pd 
-import matplotlib.pyplot as plt 
+from datetime import date 
 from signals.mean_reversion import MeanReversionSignal
 from signals.momentum import MomentumSignal
-from utils.metrics import *
+from backtest.backtest_engine import run_backtest
+from utils.logger import log_daily_result
 
-def run_backtest(signal_func, df):
-    # Filter rows from the beginning to end_date (inclusive)
-    df = signal_func(df)
-    
-    df["Return"] = df["Close"].pct_change()
-    df["Strategy"] = df["Position"].shift(1)*df["Return"]
 
-    #Evaluation
-    df[["Return", "Strategy"]].cumsum().plot(title="Cummulative returns")
-    plt.show()
-
-    sharpe = sharpe_ratio(df["Strategy"])
-    drawdown = max_drawndown(df["Strategy"])
-    print(f"Sharpe: {sharpe:.2f} | Drawdown: {drawdown:.2f}")
-    return df
-    
-    
-    
 if __name__ == "__main__":
     df = pd.read_csv(
         "Dataset/spx_data_v1.csv",  # Replace with your CSV file path
@@ -43,8 +24,8 @@ if __name__ == "__main__":
     # Drop rows with invalid dates (e.g., 1918 or numeric dates like 42009)
     df = df[df.index.notna()]
     
-    mom = MeanReversionSignal()
-    run_backtest(mom.generate, df)
+    signal = MomentumSignal()
     
+    df = run_backtest(signal.generate, df)
     
-    
+    log_daily_result(df, "SPX Index")
