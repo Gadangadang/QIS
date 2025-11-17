@@ -22,6 +22,7 @@ class PaperTrader:
         position_col: str = "Position",
         start_date: "pd.Timestamp|str" = None,
         end_date: "pd.Timestamp|str" = None,
+        transaction_cost:float=3
     ) -> pd.DataFrame:
         """Simulate strategy over `df`.
 
@@ -30,6 +31,7 @@ class PaperTrader:
             position_col: column name that holds signal positions (1/0/-1).
             start_date: if provided, only compute portfolio and report trades from this date onward.
             end_date: if provided, restrict simulation to this end date (inclusive).
+            transaction_cost: cost per trade in basis points (bps), e.g., 3 = 0.03%
         """
         df = df.copy()
         # Ensure position column exists
@@ -42,6 +44,19 @@ class PaperTrader:
         # Daily returns
         df["Return"] = df["Close"].pct_change().fillna(0)
         df["Strategy"] = df["ExecPosition"] * df["Return"]
+        
+        # Add transaction costs
+        # === TRANSACTION COSTS ===
+        if transaction_cost > 0:
+            # How much of the portfolio changed position today?
+            df["PositionChange"] = df["ExecPosition"].diff().abs()
+            df["PositionChange"] = df["PositionChange"].fillna(df["ExecPosition"].abs())
+
+            # Apply cost proportional to turnover
+            trade_cost = df["PositionChange"] * (transaction_cost / 10_000)
+            df["Strategy"] -= trade_cost.fillna(0)
+            
+        
 
         # Optionally restrict to an end date for the internal dataframe used for calculations
         if end_date is not None:

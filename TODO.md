@@ -10,8 +10,15 @@ Improvement             Why             Difficulty
 
 1. In-sample excellence
 2. In-sample Permutation test
-3. Walk forward test
+3. Walk forward engine
 4. Walk forward permutation test?
+5. Vectorize shit?
+
+
+
+
+
+
 
 GitHub Copilot: Short answer: partly implemented. Below I map each step to the current code, explain what's present vs missing, and give concise suggestions to fully implement each (including safe choices for time-series permutation).
 

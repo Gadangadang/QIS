@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import date 
 from signals.mean_reversion import MeanReversionSignal
 from signals.momentum import MomentumSignal
-from backtest.backtest_engine import run_backtest
+from backtest.backtest_engine import run_train_test
 from utils.logger import log_daily_result
 from live.paper_trader import PaperTrader
 import os
@@ -56,3 +56,4 @@ if __name__ == "__main__":
         result_df["Strategy"] = result_df["ExecPosition"] * result_df["Return"]
 
     log_daily_result(result_df, "SPX Index")
+    
