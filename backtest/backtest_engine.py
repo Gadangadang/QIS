@@ -73,23 +73,6 @@ def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookb
     }
 
 
-def run_backtest(signal_func, df):
-    # Filter rows from the beginning to end_date (inclusive)
-    df = signal_func(df)
-
-    df["Return"] = df["Close"].pct_change()
-    df["Strategy"] = df["Position"].shift(1) * df["Return"]
-
-    # Evaluation
-    df[["Return", "Strategy"]].cumsum().plot(title="Cummulative returns")
-    plt.show()
-
-    sharpe = sharpe_ratio(df["Strategy"])
-    # max_drawdown expects daily returns (not cumulative)
-    drawdown = max_drawdown(df["Strategy"]) 
-    print(f"Sharpe: {sharpe:.2f} | Max Drawdown: {drawdown:.2%}")
-    return df
-
 
 if __name__ == "__main__":
     df = pd.read_csv(
