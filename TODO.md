@@ -13,6 +13,14 @@ Improvement             Why             Difficulty
 3. Walk forward engine
 4. Walk forward permutation test?
 5. Vectorize shit?
+6. Add multiple signals;
+Signal Type,Example,Typical Hold Period,Correlation
+* Trend / Momentum,"ROC(60), ROC(120), MACD histogram",1–6 months,High with each other
+* Mean Reversion,"Z-score of (Close / SMA), RSI",3–20 days,Negative with trend
+* Volatility,Go long when VIX > 80th percentile,Days to weeks,Low
+* Seasonality,"Turn-of-month, Friday effect",Days,Very Low
+* Volume / Liquidity,"Volume breakout, OBV divergence",Weeks,Low
+* Cross-sectional (later),Rank stocks by momentum → long top 20%,Months,N/A
 
 
 
