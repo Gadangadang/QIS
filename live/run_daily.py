@@ -1,29 +1,20 @@
-import os 
-import sys 
 from pathlib import Path
-
-
-# Force logs to project root, no matter where we are called from
-PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import pandas as pd 
+import pandas as pd
 from datetime import date, datetime
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 from signals.mean_reversion import MeanReversionSignal
 from signals.momentum import MomentumSignal
 from signals.ensemble import EnsembleSignal, EnsembleSignalNew
 from backtest.backtest_engine import run_train_test
 from utils.logger import log_daily_result
 from live.paper_trader import PaperTrader
-import pandas as pd
+
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+LOG_DIR = PROJECT_ROOT / "logs"
 
 def load_data() -> pd.DataFrame:
     """Load and fix SPX data — 100% bulletproof."""
     csv_path = "Dataset/spx_full_1990_2025.csv"
-    
     print(f"Loading data from {csv_path}...")
     df = pd.read_csv(csv_path, index_col=0)
     
@@ -37,6 +28,9 @@ def load_data() -> pd.DataFrame:
     return df
 
 def main():
+    # ensure logs dir exists
+    LOG_DIR.mkdir(exist_ok=True)
+
     df = load_data()
 
     # === 1. Define all signals ===
@@ -52,21 +46,21 @@ def main():
     }
 
     # === 2. Run train/test split evaluation (optional sanity check) ===
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("   QUICK TRAIN/TEST EVALUATION (2015–2025 test period)")
-    print("="*60)
+    print("" + "=" * 60)
     for name, signal in signals.items():
         print(f"\n→ {name}")
         result = run_train_test(signal.generate, df.copy())
         summary = result["summary"]
-        print(f"   Test Sharpe: {summary['sharpe']:+.3f} | "
-              f"Return: {summary['total_return_pct']:+.1f}% | "
-              f"MaxDD: {summary['max_drawdown_pct']:.1f}%")
+        print(
+            f"   Test Sharpe: {summary['sharpe']:+.3f} | Return: {summary['total_return_pct']:+.1f}% | MaxDD: {summary['max_drawdown_pct']:.1f}%"
+        )
 
     # === 3. Run FULL 1990–2025 simulation on Ensemble (the real one) ===
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("   FULL 1990–2025 BACKTEST — ENSEMBLE STRATEGY")
-    print("="*60)
+    print("" + "=" * 60)
 
     ensemble_signal = signals["EnsembleNew"]
     df_with_signal = ensemble_signal.generate(df.copy())
@@ -76,7 +70,6 @@ def main():
 
     # === 4. Save trades ===
     if hasattr(trader, "trades") and not trader.trades.empty:
-        
         trades_path = LOG_DIR / f"trades_ensemble_{datetime.now().strftime('%Y%m%d')}.csv"
         trader.trades.to_csv(trades_path, index=False)
         print(f"Trades saved → {trades_path.name}")
@@ -89,8 +82,7 @@ def main():
     # === 6. Log daily result ===
     log_daily_result(result_df, "SPX Ensemble Strategy")
 
-    print("\nBacktest complete. You're running institutional-grade code.")
-    print("Next step: walk-forward → then live.")
+    print("\nBacktest complete.")
 
 
 if __name__ == "__main__":

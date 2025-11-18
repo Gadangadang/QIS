@@ -7,7 +7,6 @@ from utils.metrics import sharpe_ratio, max_drawdown
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
 
 class PaperTrader:
     """Simple paper trading simulator.

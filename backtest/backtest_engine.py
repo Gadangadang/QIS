@@ -6,13 +6,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import yfinance as yf
 
 from signals.momentum import MomentumSignal
 from signals.mean_reversion import MeanReversionSignal
 from signals.ensemble import EnsembleSignal
 from utils.metrics import max_drawdown, sharpe_ratio
 from live.paper_trader import PaperTrader
+
 
 
 def split_train_test(df: pd.DataFrame, train_frac: float = 0.6, lookback: int = 20):
@@ -63,9 +63,9 @@ def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookb
     result_df = trader.simulate(test_signals_all, position_col="Position", start_date=start_date)
 
     summary = trader.summary()
-    
+
     trader.print_summary()
-    
+
     trader.plot()
     
     return {
@@ -95,8 +95,8 @@ if __name__ == "__main__":
     # Final check — THIS WILL NOW WORK
     print(f"Loaded {len(df):,} daily bars")
     print(f"Date range: {df.index[0].date()} to {df.index[-1].date()}")
-    print(f"Index type: {type(df.index)} → {type(df.index[0])}")
-    
+    print(f"Index type: {type(df.index)} -> {type(df.index[0])}")
+
     # Final sanity check
     print(f"Columns: {list(df.columns)}")
     print(f"First 3 rows:\n{df.head(3)}")
