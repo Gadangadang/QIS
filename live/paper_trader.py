@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np 
 import matplotlib.pyplot as plt
 from utils.metrics import sharpe_ratio, max_drawdown
 
@@ -38,15 +39,16 @@ class PaperTrader:
         if position_col not in df.columns:
             raise ValueError(f"Position column '{position_col}' not found in dataframe")
 
-        # Use executed position = yesterday's signal
+        # 1. Use executed position = yesterday's signal
         df["ExecPosition"] = df[position_col].shift(1).fillna(0)
 
-        # Daily returns
+        # 2. Daily returns 
         df["Return"] = df["Close"].pct_change().fillna(0)
+        
+        # 3. Strategy returns before costs
         df["Strategy"] = df["ExecPosition"] * df["Return"]
         
-        # Add transaction costs
-        # === TRANSACTION COSTS ===
+        # 4. Add transaction costs
         if transaction_cost > 0:
             # How much of the portfolio changed position today?
             df["PositionChange"] = df["ExecPosition"].diff().abs()
@@ -58,81 +60,55 @@ class PaperTrader:
             
         
 
-        # Optionally restrict to an end date for the internal dataframe used for calculations
-        if end_date is not None:
-            end_ts = pd.to_datetime(end_date)
-            df = df.loc[df.index <= end_ts].copy()
-
-        # If a start_date is given, ensure Strategy before start_date does not affect portfolio
-        s = df["Strategy"].fillna(0).copy()
+        # 5. Date filtering
         if start_date is not None:
-            start_ts = pd.to_datetime(start_date)
-            # Zero out strategy before the start date so cumulative product begins at start
-            s.loc[df.index < start_ts] = 0
+            start_date = pd.to_datetime(start_date)
+            df.loc[df.index < start_date, "Strategy"] = 0
+        if end_date is not None:
+            end_date = pd.to_datetime(end_date)
+            df = df.loc[df.index <= end_date]
 
-        # Portfolio value computed with possible zeroed pre-start strategy
-        df["PortfolioValue"] = (1 + s).cumprod() * self.initial_cash
+        # 6. Portfolio value computation
+        df["PortfolioValue"] = (1 + df["Strategy"]).cumprod() * self.initial_cash
 
-        # Track trades (entry / exit when ExecPosition changes)
+        # 7. Vectorized trade detection (this is the magic)
+        df["Trade"] = df["ExecPosition"].diff().fillna(df["ExecPosition"])
+        entry_mask = df["Trade"] != 0
+        df["TradeID"] = entry_mask.cumsum()
+
         trades = []
-        current_trade = None
-        prev_pos = 0
-        for idx, row in df.iterrows():
-            pos = row["ExecPosition"]
-            price = row.get("Close", None)
+        for trade_id, group in df[entry_mask | (df.index == df.index[-1])].groupby("TradeID"):
+            if trade_id == 0:
+                continue
+            rows = df[df["TradeID"] == trade_id]
+            if len(rows) == 0:
+                continue
 
-            if pos != prev_pos:
-                # close previous trade if any
-                if current_trade is not None:
-                    current_trade["exit_date"] = idx
-                    current_trade["exit_price"] = price
-                    # compute pnl percent
-                    if current_trade["entry_price"] and current_trade["exit_price"]:
-                        if current_trade["entry_price"] != 0:
-                            current_trade["pnl_pct"] = (
-                                current_trade["exit_price"] / current_trade["entry_price"] - 1
-                            ) * (1 if current_trade["entry_side"] == "long" else -1)
-                        else:
-                            current_trade["pnl_pct"] = None
-                    trades.append(current_trade)
-                    current_trade = None
+            entry_date = rows.index[0]
+            entry_price = rows["Close"].iloc[0]
+            entry_pos = rows["ExecPosition"].iloc[0]
 
-                # open new trade if pos != 0
-                if pos != 0:
-                    current_trade = {
-                        "entry_date": idx,
-                        "entry_price": price,
-                        "entry_side": "long" if pos == 1 else "short",
-                        "exit_date": None,
-                        "exit_price": None,
-                        "pnl_pct": None,
-                    }
+            exit_date = rows.index[-1]
+            exit_price = rows["Close"].iloc[-1]
 
-            prev_pos = pos
+            if entry_price == 0:
+                continue
 
-        # if there's an open trade at the end, close it at last price
-        if current_trade is not None:
-            last_idx = df.index[-1]
-            last_price = df.iloc[-1]["Close"]
-            current_trade["exit_date"] = last_idx
-            current_trade["exit_price"] = last_price
-            if current_trade["entry_price"] and current_trade["exit_price"]:
-                if current_trade["entry_price"] != 0:
-                    current_trade["pnl_pct"] = (
-                        current_trade["exit_price"] / current_trade["entry_price"] - 1
-                    ) * (1 if current_trade["entry_side"] == "long" else -1)
-            trades.append(current_trade)
+            pnl_pct = (exit_price / entry_price - 1) * np.sign(entry_pos)
 
-        trades_df = pd.DataFrame(trades)
-        if not trades_df.empty:
-            trades_df["pnl_pct"] = trades_df["pnl_pct"].astype(float)
+            trades.append({
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_price": entry_price,
+                "exit_price": exit_price,
+                "side": "long" if entry_pos > 0 else "short",
+                "pnl_pct": pnl_pct,
+            })
 
-        # If start_date provided, only keep trades that start on/after start_date
-        if start_date is not None and not trades_df.empty:
-            start_ts = pd.to_datetime(start_date)
-            trades_df = trades_df[trades_df["entry_date"] >= start_ts].reset_index(drop=True)
+        self.trades = pd.DataFrame(trades)
+        if not self.trades.empty:
+            self.trades = self.trades[self.trades["entry_date"] >= (pd.to_datetime(start_date) if start_date else self.trades["entry_date"].min())]
 
-        self.trades = trades_df
         self.result = df
         return df
 
@@ -171,7 +147,10 @@ class PaperTrader:
                 "gross_profit_pct": wins["pnl_pct"].sum() if not wins.empty else 0.0,
                 "gross_loss_pct": losses["pnl_pct"].sum() if not losses.empty else 0.0,
             })
-
+        else:
+            stats = {k: 0 for k in ["n_trades", "win_rate", "avg_win_pct", "avg_loss_pct", "gross_profit_pct", "gross_loss_pct"]}
+            stats["n_trades"] = 0
+            
         # Final clean dict with rounded floats
         summary_ = {
             "total_return_pct": round(float(total_return), round_digits),
@@ -198,17 +177,23 @@ class PaperTrader:
             print(f"Avg Loss           : {s['avg_loss_pct']:+.2%}")
         print("="*50 + "\n")
 
-    def plot(self, show=True):
+    def plot(self, title: str = "Strategy Equity Curve", show: bool = True):
         if not hasattr(self, "result"):
-            raise RuntimeError("No simulation run. Call simulate() first.")
+            raise RuntimeError("Run simulate() first")
         df = self.result
-        fig, ax = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
-        ax[0].plot(df.index, (1 + df["Strategy"]).cumprod() - 1)
-        ax[0].set_title("Strategy Cumulative Return")
-        ax[0].axhline(0, color="k", lw=0.5)
 
-        ax[1].plot(df.index, df["ExecPosition"], drawstyle="steps-post")
-        ax[1].set_title("Executed Position (1=long, -1=short, 0=flat)")
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True, gridspec_kw={'height_ratios': [3, 1]})
+
+        ax1.plot(df.index, df["PortfolioValue"], label="Strategy", linewidth=1.5)
+        ax1.set_title(title)
+        ax1.set_ylabel("Portfolio Value ($)")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        df["ExecPosition"].plot(ax=ax2, drawstyle="steps-post", linewidth=1.5, color="tab:orange")
+        ax2.set_title("Position Over Time")
+        ax2.set_ylabel("Position")
+        ax2.set_ylim(-1.1, 1.1)
 
         plt.tight_layout()
         if show:
