@@ -10,23 +10,34 @@ class MeanReversionSignal(SignalModel):
 
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
-        
-        sma = df["Close"].rolling(self.window).mean()
-        std = df["Close"].rolling(self.window).std()
-        df["Z"] = (df["Close"] - sma) / std
+        close = df["Close"]
+        sma = close.rolling(self.window).mean()
+        std = close.rolling(self.window).std()
+        df["Z"] = (close - sma) / std
+
+        df["Position"] = 0
 
         # Entry
-        df["RawPosition"] = np.select(
-            [df["Z"] <= -self.entry_z, df["Z"] >= self.entry_z],
-            [1, -1], default=0
-        )
+        long_entry  = df["Z"] <= -self.entry_z
+        short_entry = df["Z"] >= self.entry_z
+        df.loc[long_entry, "Position"] = 1
+        df.loc[short_entry, "Position"] = -1
 
-        # Forward fill + exit when Z gets back toward mean
-        df["Position"] = df["RawPosition"].replace(0, np.nan).ffill().fillna(0)
-        exit_condition = (df["Position"] != 0) & (df["RawPosition"] == 0) & (abs(df["Z"]) < self.exit_z)
-        df.loc[exit_condition, "Position"] = 0
+        # Exit: when Z crosses back toward zero
+        exit_long  = (df["Position"] == 1) & (df["Z"] >= -self.exit_z)
+        exit_short = (df["Position"] == -1) & (df["Z"] <= self.exit_z)
+        df.loc[exit_long | exit_short, "Position"] = 0
 
-        # New signal overrides exit
-        df.loc[df["RawPosition"] != 0, "Position"] = df["RawPosition"]
-        
+        # Forward fill
+        df["Position"] = df["Position"].replace(0, np.nan).ffill()
+
+        # FINAL SAFETY: if price moves AGAINST position by > entry_z, exit immediately
+        kill_long  = (df["Position"] == 1) & (df["Z"] > self.entry_z)
+        kill_short = (df["Position"] == -1) & (df["Z"] < -self.entry_z)
+        df.loc[kill_long | kill_short, "Position"] = 0
+
+        # Burn-in
+        df.iloc[:self.window + 20, df.columns.get_loc("Position")] = 0
+
+        df["Position"] = df["Position"].fillna(0).astype(int)
         return df

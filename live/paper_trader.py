@@ -1,8 +1,13 @@
 import pandas as pd
 import numpy as np 
 import matplotlib.pyplot as plt
+from datetime import datetime
+from pathlib import Path
 from utils.metrics import sharpe_ratio, max_drawdown
 
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR.mkdir(exist_ok=True)
 
 class PaperTrader:
     """Simple paper trading simulator.
@@ -70,6 +75,9 @@ class PaperTrader:
 
         # 6. Portfolio value computation
         df["PortfolioValue"] = (1 + df["Strategy"]).cumprod() * self.initial_cash
+        """print(f"Strategy returns range: min {df['Strategy'].min():.4f}, max {df['Strategy'].max():.4f}")
+        print(f"Any returns > 0.5? { (df['Strategy'] > 0.5).sum() } days")
+        exit()"""
 
         # 7. Vectorized trade detection (this is the magic)
         df["Trade"] = df["ExecPosition"].diff().fillna(df["ExecPosition"])
@@ -177,7 +185,7 @@ class PaperTrader:
             print(f"Avg Loss           : {s['avg_loss_pct']:+.2%}")
         print("="*50 + "\n")
 
-    def plot(self, title: str = "Strategy Equity Curve", show: bool = True):
+    def plot(self, title: str = "Strategy Equity Curve", show: bool = True, save:bool=False):
         if not hasattr(self, "result"):
             raise RuntimeError("Run simulate() first")
         df = self.result
@@ -196,6 +204,12 @@ class PaperTrader:
         ax2.set_ylim(-1.1, 1.1)
 
         plt.tight_layout()
+        if save:
+            plt.savefig(LOG_DIR / f"equity_curve_ensemble_{datetime.now().strftime('%Y%m%d')}.png")
+            
         if show:
             plt.show()
+            
+        
         return fig
+

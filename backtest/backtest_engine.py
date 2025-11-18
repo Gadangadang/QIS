@@ -79,26 +79,31 @@ def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookb
 
 
 if __name__ == "__main__":
-    df = pd.read_csv(
-        "Dataset/spx_data_v1.csv",  # Replace with your CSV file path
-        sep=";",  # Semicolon delimiter
-        usecols=[
-            "Date",
-            "Open",
-            "Adj Close",
-            "Close",
-            "Volume",
-        ],  # Select desired columns
-        index_col="Date",  # Set Date as the index
-        parse_dates=["Date"],  # Parse Date column as datetime
-        dayfirst=True,  # Handle DD.MM.YYYY format (e.g., 02.01.2015)
-        na_values=["#N/A N/A"],  # Treat '#N/A N/A' as NaN
-    )
-    # Convert Date index to datetime if not already parsed correctly
-    df.index = pd.to_datetime(df.index, errors="coerce", dayfirst=True)
-    # Drop rows with invalid dates (e.g., 1918 or numeric dates like 42009)
-    df = df[df.index.notna()]
+    print("Loading and FIXING SPX daily data...")
 
+    df = pd.read_csv("Dataset/spx_full_1990_2025.csv", index_col=0)  # load as strings first
+
+    # THIS IS THE NUCLEAR FIX — forces datetime index no matter what
+    df.index = pd.to_datetime(df.index, format="%Y-%m-%d", errors="coerce")
+
+    # Drop any impossible dates (should be none)
+    df = df.dropna(subset=["Open", "High", "Low", "Close"])  # also removes bad rows
+
+    # Sort chronological (oldest first)
+    df = df.sort_index(ascending=True)
+
+    # Final check — THIS WILL NOW WORK
+    print(f"Loaded {len(df):,} daily bars")
+    print(f"Date range: {df.index[0].date()} to {df.index[-1].date()}")
+    print(f"Index type: {type(df.index)} → {type(df.index[0])}")
+    
+    # Final sanity check
+    print(f"Columns: {list(df.columns)}")
+    print(f"First 3 rows:\n{df.head(3)}")
+    print(f"Last 3 rows:\n{df.tail(3)}")
+
+    
+    
     signals_to_test = {
         "Momentum_60d": MomentumSignal(lookback=60,  threshold=0.025),
         "Momentum_120d": MomentumSignal(lookback=120, threshold=0.02),

@@ -8,30 +8,32 @@ class MomentumSignal(SignalModel):
         self.threshold = threshold    # Only trade at ~2% momentum
         self.exit_threshold = exit_threshold      # Optional: exit early when momentum reverts
 
-    def generate(self, df:pd.DataFrame)->pd.DataFrame:
-        # Momentum = total return over lookback period
-        df["Momentum"] = df["Close"].pct_change(self.lookback)
-        
-        # Raw entry signals
-        entry_long = df["Momentum"] > self.threshold
-        entry_short = df["Momentum"] < -self.threshold
-        raw_position = np.where(entry_long, 1, np.where(entry_short, -1, 0))
+    def generate(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        close = df["Close"]
 
-        # Make a Series with the same index so assignments align correctly
-        raw_s = pd.Series(raw_position, index=df.index)
+        df["Momentum"] = close / close.shift(self.lookback) - 1
 
-        # Forward fill position, but exit when momentum weakens
-        df["Position"] = raw_s.replace(0, np.nan).ffill()
-        df["Position"] = df["Position"].fillna(0)
-        
-        # Exit condition: momentum fades
-        fade_long = (df["Position"] == 1) & (df["Momentum"] < self.exit_threshold)
-        fade_short = (df["Position"] == -1) & (df["Momentum"] > -self.exit_threshold)
-        df.loc[fade_long | fade_short, "Position"] = 0
-        
-        # Override with new entries
-        # Ensure assigning only the corresponding values (align by index)
-        df.loc[raw_s != 0, "Position"] = raw_s[raw_s != 0]
+        # ONLY trade when we have valid momentum AND it's been valid for a while
+        df["Position"] = 0
+        # Only go long when strong AND positive
+        enter = (df["Momentum"] > self.threshold) & (df["Momentum"] > 0)
+        exit  = df["Momentum"] <= 0
+
+        # Apply entry
+        df.loc[enter, "Position"] = 1
+        # Apply exit (override)
+        df.loc[exit, "Position"] = 0
+
+        # Forward fill — but exit always wins
+        df["Position"] = df["Position"].replace(0, np.nan).ffill(limit=None)
+        df.loc[exit, "Position"] = 0  # FINAL OVERRIDE
+
+        # Burn-in
+        df.iloc[:self.lookback + 20, df.columns.get_loc("Position")] = 0
+
+        df["Position"] = df["Position"].fillna(0).astype(int)
+
         return df
-      
+        
 
