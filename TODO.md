@@ -1,6 +1,5 @@
 
 Improvement             Why             Difficulty
-* Transaction costs           Even 1–2 bps kills many strategies          Easy
 *Slippage model         Especially on shorts or low-liquidity           Easy
 *Position sizing (e.g. Kelly, volatility targeting)         Right now it’s always 100%          Medium
 * Partial fills / order queue simulation            For very large AUM          Hard

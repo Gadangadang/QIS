@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
 
-from signals.mean_reversion import MeanReversionSignal
 from signals.momentum import MomentumSignal
+from signals.mean_reversion import MeanReversionSignal
+from signals.ensemble import EnsembleSignal
 from utils.metrics import max_drawdown, sharpe_ratio
 from live.paper_trader import PaperTrader
 
@@ -62,8 +63,11 @@ def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookb
     result_df = trader.simulate(test_signals_all, position_col="Position", start_date=start_date)
 
     summary = trader.summary()
-    print(f"Test period summary: {summary}")
-
+    
+    trader.print_summary()
+    
+    trader.plot()
+    
     return {
         "train_df": train_signals,
         "test_input_df": test_signals_all,
@@ -95,5 +99,17 @@ if __name__ == "__main__":
     # Drop rows with invalid dates (e.g., 1918 or numeric dates like 42009)
     df = df[df.index.notna()]
 
-    mom = MeanReversionSignal()
-    run_train_test(mom.generate, df)
+    signals_to_test = {
+        "Momentum_60d": MomentumSignal(lookback=60,  threshold=0.025),
+        "Momentum_120d": MomentumSignal(lookback=120, threshold=0.02),
+        "Momentum_250d": MomentumSignal(lookback=250, threshold=0.018),
+        "MR_10": MeanReversionSignal(window=10,  entry_z=2.2, exit_z=1.0),
+        "MR_20": MeanReversionSignal(window=20,  entry_z=2.0, exit_z=1.0),
+        "MR_60": MeanReversionSignal(window=60,  entry_z=1.8, exit_z=1.0),
+        "Ensemble": EnsembleSignal(),  # ← this uses the fixed signals inside
+    }
+
+    for name, signal in signals_to_test.items():
+        print(f"\n=== Testing {name} ===")
+        result = run_train_test(signal.generate, df.copy())
+        print(f"→ Test Sharpe: {result['summary']['sharpe']:.2f} | Return: {result['summary']['total_return_pct']:.1%}")

@@ -136,36 +136,67 @@ class PaperTrader:
         self.result = df
         return df
 
-    def summary(self):
+    def summary(self, round_digits: int = 3) -> dict:
         if not hasattr(self, "result"):
             raise RuntimeError("No simulation run. Call simulate() first.")
 
         df = self.result
+
+        # Core metrics
         total_return = df["PortfolioValue"].iloc[-1] / self.initial_cash - 1
-        ann_sharpe = sharpe_ratio(df["Strategy"].fillna(0))
+        sharpe = sharpe_ratio(df["Strategy"].fillna(0))
         max_dd = max_drawdown(df["Strategy"].fillna(0))
 
-        trade_stats = {}
+        # Trade stats
+        trade_stats = {
+            "n_trades": 0,
+            "win_rate": 0.0,
+            "avg_win_pct": 0.0,
+            "avg_loss_pct": 0.0,
+            "gross_profit_pct": 0.0,
+            "gross_loss_pct": 0.0,
+        }
+
         trades = getattr(self, "trades", pd.DataFrame())
         if not trades.empty:
             wins = trades[trades["pnl_pct"] > 0]
             losses = trades[trades["pnl_pct"] <= 0]
-            trade_stats = {
-                "n_trades": len(trades),
-                "win_rate": len(wins) / len(trades),
-                "avg_win_pct": wins["pnl_pct"].mean() if not wins.empty else 0,
-                "avg_loss_pct": losses["pnl_pct"].mean() if not losses.empty else 0,
-                "gross_profit_pct": wins["pnl_pct"].sum() if not wins.empty else 0,
-                "gross_loss_pct": losses["pnl_pct"].sum() if not losses.empty else 0,
-            }
 
-        summary = {
-            "total_return_pct": total_return,
-            "sharpe": ann_sharpe,
-            "max_drawdown_pct": max_dd,
-            **trade_stats,
+            n = len(trades)
+            trade_stats.update({
+                "n_trades": int(n),
+                "win_rate": len(wins) / n,
+                "avg_win_pct": wins["pnl_pct"].mean() if not wins.empty else 0.0,
+                "avg_loss_pct": losses["pnl_pct"].mean() if not losses.empty else 0.0,
+                "gross_profit_pct": wins["pnl_pct"].sum() if not wins.empty else 0.0,
+                "gross_loss_pct": losses["pnl_pct"].sum() if not losses.empty else 0.0,
+            })
+
+        # Final clean dict with rounded floats
+        summary_ = {
+            "total_return_pct": round(float(total_return), round_digits),
+            "sharpe": round(float(sharpe), round_digits),
+            "max_drawdown_pct": round(float(max_dd), round_digits),
+            **{k: round(float(v), round_digits) if k != "n_trades" else int(v)
+            for k, v in trade_stats.items()},
         }
-        return summary
+
+        return summary_
+    
+    def print_summary(self):
+        s = self.summary()
+        print("\n" + "="*50)
+        print("           BACKTEST SUMMARY")
+        print("="*50)
+        print(f"Total Return       : {s['total_return_pct']:+.2%}")
+        print(f"Sharpe Ratio       : {s['sharpe']:+.3f}")
+        print(f"Max Drawdown       : {s['max_drawdown_pct']:.2%}")
+        print(f"Number of Trades   : {s['n_trades']}")
+        if s['n_trades'] > 0:
+            print(f"Win Rate           : {s['win_rate']:.1%}")
+            print(f"Avg Win            : {s['avg_win_pct']:+.2%}")
+            print(f"Avg Loss           : {s['avg_loss_pct']:+.2%}")
+        print("="*50 + "\n")
 
     def plot(self, show=True):
         if not hasattr(self, "result"):

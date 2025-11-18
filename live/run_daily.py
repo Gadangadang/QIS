@@ -27,7 +27,8 @@ if __name__ == "__main__":
     # Drop rows with invalid dates (e.g., 1918 or numeric dates like 42009)
     df = df[df.index.notna()]
     
-    signal = MomentumSignal()
+    MOM_signal = MomentumSignal(50, entry_z=2, exit_z=0.5)
+    MR_signal = MeanReversionSignal()
 
     # Generate signals
     df = signal.generate(df)
@@ -45,8 +46,8 @@ if __name__ == "__main__":
         print(f"Saved trades to {trades_path}")
 
     # Print summary and show plots
-    summary = trader.summary()
-    print("Simulation summary:", summary)
+    trader.print_summary()
+    
     trader.plot()
 
     # Log daily result (keeps compatibility with existing logger)
