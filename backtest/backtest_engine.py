@@ -14,7 +14,6 @@ from utils.metrics import max_drawdown, sharpe_ratio
 from live.paper_trader import PaperTrader
 
 
-
 def split_train_test(df: pd.DataFrame, train_frac: float = 0.6, lookback: int = 20):
     """Split dataframe into train and test windows, returning the train slice and a
     test slice that includes `lookback` rows of history before the test start.
@@ -33,18 +32,28 @@ def split_train_test(df: pd.DataFrame, train_frac: float = 0.6, lookback: int = 
     return train_df, test_with_history, test_only
 
 
-def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookback: int = 20, initial_cash: float = 100000):
+def run_train_test(
+    signal_func,
+    df: pd.DataFrame,
+    train_frac: float = 0.6,
+    lookback: int = 20,
+    initial_cash: float = 100000,
+):
     """Run a train/test split. The signal function is applied to the train slice for analysis,
     then re-applied over the test window including `lookback` history so indicators can initialize.
 
     Returns a dict with train_df, test_input_df (with history), test_result_df and trader summary.
     """
-    train_df, test_with_history, test_only = split_train_test(df, train_frac=train_frac, lookback=lookback)
+    train_df, test_with_history, test_only = split_train_test(
+        df, train_frac=train_frac, lookback=lookback
+    )
 
     # Generate signals on train and evaluate
     train_signals = signal_func(train_df)
     train_signals["Return"] = train_signals["Close"].pct_change()
-    train_signals["Strategy"] = train_signals["Position"].shift(1) * train_signals["Return"]
+    train_signals["Strategy"] = (
+        train_signals["Position"].shift(1) * train_signals["Return"]
+    )
 
     # Simple train evaluation
     train_sharpe = sharpe_ratio(train_signals["Strategy"].fillna(0))
@@ -60,14 +69,16 @@ def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookb
 
     # Run paper trading on the full test_with_history but only count metrics/trades from start_date
     trader = PaperTrader(initial_cash=initial_cash)
-    result_df = trader.simulate(test_signals_all, position_col="Position", start_date=start_date)
+    result_df = trader.simulate(
+        test_signals_all, position_col="Position", start_date=start_date
+    )
 
     summary = trader.summary()
 
     trader.print_summary()
 
     trader.plot()
-    
+
     return {
         "train_df": train_signals,
         "test_input_df": test_signals_all,
@@ -77,11 +88,12 @@ def run_train_test(signal_func, df: pd.DataFrame, train_frac: float = 0.6, lookb
     }
 
 
-
 if __name__ == "__main__":
     print("Loading and FIXING SPX daily data...")
 
-    df = pd.read_csv("Dataset/spx_full_1990_2025.csv", index_col=0)  # load as strings first
+    df = pd.read_csv(
+        "Dataset/spx_full_1990_2025.csv", index_col=0
+    )  # load as strings first
 
     # THIS IS THE NUCLEAR FIX — forces datetime index no matter what
     df.index = pd.to_datetime(df.index, format="%Y-%m-%d", errors="coerce")
@@ -102,19 +114,19 @@ if __name__ == "__main__":
     print(f"First 3 rows:\n{df.head(3)}")
     print(f"Last 3 rows:\n{df.tail(3)}")
 
-    
-    
     signals_to_test = {
-        "Momentum_60d": MomentumSignal(lookback=60,  threshold=0.025),
+        "Momentum_60d": MomentumSignal(lookback=60, threshold=0.025),
         "Momentum_120d": MomentumSignal(lookback=120, threshold=0.02),
         "Momentum_250d": MomentumSignal(lookback=250, threshold=0.018),
-        "MR_10": MeanReversionSignal(window=10,  entry_z=2.2, exit_z=1.0),
-        "MR_20": MeanReversionSignal(window=20,  entry_z=2.0, exit_z=1.0),
-        "MR_60": MeanReversionSignal(window=60,  entry_z=1.8, exit_z=1.0),
+        "MR_10": MeanReversionSignal(window=10, entry_z=2.2, exit_z=1.0),
+        "MR_20": MeanReversionSignal(window=20, entry_z=2.0, exit_z=1.0),
+        "MR_60": MeanReversionSignal(window=60, entry_z=1.8, exit_z=1.0),
         "Ensemble": EnsembleSignal(),  # ← this uses the fixed signals inside
     }
 
     for name, signal in signals_to_test.items():
         print(f"\n=== Testing {name} ===")
         result = run_train_test(signal.generate, df.copy())
-        print(f"→ Test Sharpe: {result['summary']['sharpe']:.2f} | Return: {result['summary']['total_return_pct']:.1%}")
+        print(
+            f"→ Test Sharpe: {result['summary']['sharpe']:.2f} | Return: {result['summary']['total_return_pct']:.1%}"
+        )
