@@ -29,6 +29,11 @@ class PaperTrader:
         start_date: "pd.Timestamp|str" = None,
         end_date: "pd.Timestamp|str" = None,
         transaction_cost: float = 3,
+        stop_loss_pct: float | None = None,
+        take_profit_pct: float | None = None,
+        max_hold_days: int | None = None,
+        stop_mode: str = "close",
+        max_position_pct: float = 1.0,
     ) -> pd.DataFrame:
         """Simulate strategy over `df`.
 
@@ -47,11 +52,153 @@ class PaperTrader:
         # 1. Use executed position = yesterday's signal
         df["ExecPosition"] = df[position_col].shift(1).fillna(0)
 
+        # support per-row size overrides (signal may supply a `Size` column with fraction);
+        # otherwise use global `max_position_pct` as the cap (1.0 = fully invested)
+        if "Size" in df.columns:
+            exec_size = df["Size"].shift(1).fillna(1.0).clip(upper=max_position_pct)
+        else:
+            exec_size = pd.Series(max_position_pct, index=df.index)
+
+        # apply sizing to executed position
+        df["ExecPosition"] = df["ExecPosition"] * exec_size
+
+        # 1b. Apply execution-level risk controls (stop-loss, take-profit, max-hold)
+        # Work on a copy of the executed position series so we can modify exits
+        exec_series = df["ExecPosition"].copy()
+
+        # mapping from (entry_date, exit_date) -> exit_reason for later trade annotation
+        # use index labels (timestamps) so the mapping survives date filtering/slicing
+        exit_reasons_map = {}
+
+        # intraday exit price map: index_label -> exit_price (used when stop_mode != 'close')
+        intraday_exit_map = {}
+
+        current_pos = 0
+        entry_idx = None
+        entry_price = None
+        hold_days = 0
+        per_stop = None
+        per_take = None
+        per_max_hold = None
+
+        # iterate through rows to detect stop / take-profit / max-hold triggers
+        for i in range(len(df)):
+            idx = df.index[i]
+            price = df.at[idx, "Close"]
+            pos = float(exec_series.iloc[i]) if not pd.isna(exec_series.iloc[i]) else 0.0
+
+            # detect new entry
+            if current_pos == 0 and pos != 0:
+                current_pos = pos
+                entry_idx = i
+                entry_price = price if price is not None else None
+                hold_days = 0
+                # per-trade overrides from signal dataframe, if present
+                per_stop = None
+                per_take = None
+                per_max_hold = None
+                if "StopLossPct" in df.columns and pd.notna(df.at[idx, "StopLossPct"]):
+                    try:
+                        per_stop = float(df.at[idx, "StopLossPct"])
+                    except Exception:
+                        per_stop = None
+                if "TakeProfitPct" in df.columns and pd.notna(df.at[idx, "TakeProfitPct"]):
+                    try:
+                        per_take = float(df.at[idx, "TakeProfitPct"])
+                    except Exception:
+                        per_take = None
+                if "MaxHoldDays" in df.columns and pd.notna(df.at[idx, "MaxHoldDays"]):
+                    try:
+                        per_max_hold = int(df.at[idx, "MaxHoldDays"])
+                    except Exception:
+                        per_max_hold = None
+                # fall back to global defaults if per-trade not provided
+                if per_stop is None:
+                    per_stop = stop_loss_pct
+                if per_take is None:
+                    per_take = take_profit_pct
+                if per_max_hold is None:
+                    per_max_hold = max_hold_days
+
+            # if currently in a trade, evaluate stop/take/max-hold
+            elif current_pos != 0:
+                hold_days += 1
+                triggered = False
+                reason = None
+                if entry_price is not None:
+                    # determine which price to use for trigger detection depending on mode
+                    check_price = price
+                    if stop_mode == "low" and "Low" in df.columns:
+                        check_price = df.at[idx, "Low"]
+                    if stop_mode == "open" and "Open" in df.columns:
+                        check_price = df.at[idx, "Open"]
+
+                    if check_price is not None:
+                        pnl = (check_price / entry_price - 1) * np.sign(current_pos)
+                        if per_stop is not None and pnl <= -float(per_stop):
+                            triggered = True
+                            reason = "stop_loss"
+                        if not triggered and per_take is not None and pnl >= float(per_take):
+                            triggered = True
+                            reason = "take_profit"
+                if not triggered and per_max_hold is not None and per_max_hold > 0 and hold_days >= int(per_max_hold):
+                    triggered = True
+                    reason = "max_hold"
+
+                if triggered:
+                    # apply exit by setting tomorrow's executed position to 0 (if exists)
+                    entry_label = df.index[entry_idx] if entry_idx is not None else None
+                    exit_label = df.index[i]
+                    # if using intraday mode, record exit price so we can adjust today's strategy
+                    if stop_mode in ("low", "open"):
+                        # assume fill at the stop price level (entry*(1-stop)) for long, symmetric for short
+                        if current_pos > 0:
+                            exit_price = entry_price * (1 - float(per_stop)) if per_stop is not None else df.at[idx, "Close"]
+                        else:
+                            exit_price = entry_price * (1 + float(per_stop)) if per_stop is not None else df.at[idx, "Close"]
+                        intraday_exit_map[exit_label] = exit_price
+                    if i + 1 < len(df):
+                        exec_series.iloc[i + 1] = 0
+                        exit_reasons_map[(entry_label, exit_label)] = reason
+                    else:
+                        # last row: mark exit on this index
+                        exit_reasons_map[(entry_label, exit_label)] = reason
+                    # reset current trade state
+                    current_pos = 0
+                    entry_idx = None
+                    entry_price = None
+                    hold_days = 0
+                    per_stop = None
+                    per_take = None
+                    per_max_hold = None
+
+        # assign adjusted executed positions back to dataframe
+        df["ExecPosition"] = exec_series
+
         # 2. Daily returns
         df["Return"] = df["Close"].pct_change().fillna(0)
 
         # 3. Strategy returns before costs
         df["Strategy"] = df["ExecPosition"] * df["Return"]
+
+        # If we recorded intraday exits (stop_mode in low/open), override the day's strategy
+        # return on the trigger day to reflect execution at the stop price instead of close-to-close
+        if intraday_exit_map:
+            for exit_label, exit_price in intraday_exit_map.items():
+                try:
+                    # find previous close
+                    loc = df.index.get_loc(exit_label)
+                    if loc == 0:
+                        continue
+                    prev_close = df["Close"].iloc[loc - 1]
+                    entry_pos = df["ExecPosition"].iloc[loc]
+                    # intraday pnl from prev_close to exit_price
+                    intraday_ret = (exit_price / prev_close - 1) * entry_pos
+                    df.at[exit_label, "Strategy"] = intraday_ret
+                    # Also set the day's Return to reflect exit price (used nowhere else but helpful to inspect)
+                    df.at[exit_label, "Return"] = exit_price / prev_close - 1
+                except Exception:
+                    continue
 
         # 4. Add transaction costs
         if transaction_cost > 0:
@@ -104,6 +251,23 @@ class PaperTrader:
 
             pnl_pct = (exit_price / entry_price - 1) * np.sign(entry_pos)
 
+            # try to annotate exit reason if we recorded a triggered exit
+            try:
+                # lookup by index labels (timestamps)
+                exit_reason = exit_reasons_map.get((entry_date, exit_date), None)
+                # fallback: sometimes the recorded exit label (trigger day) and the
+                # trade-detected exit_date can be off by one day due to how we
+                # set exec_series[i+1]=0 when triggering an exit. Try matching by
+                # entry_date alone as a robust fallback so exit reasons are not
+                # lost when the pair key differs by one day.
+                if exit_reason is None:
+                    for (k_entry, k_exit), r in exit_reasons_map.items():
+                        if k_entry == entry_date:
+                            exit_reason = r
+                            break
+            except Exception:
+                exit_reason = None
+
             trades.append(
                 {
                     "entry_date": entry_date,
@@ -112,6 +276,7 @@ class PaperTrader:
                     "exit_price": exit_price,
                     "side": "long" if entry_pos > 0 else "short",
                     "pnl_pct": pnl_pct,
+                    "exit_reason": exit_reason,
                 }
             )
 

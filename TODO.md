@@ -1,12 +1,24 @@
 ## TODO
 
-| Week | Dates (2025)       | Main Goal                                | Key Deliverables by Sunday night                                                                                     | Status     |
-|------|--------------------|------------------------------------------|----------------------------------------------------------------------------------------------------------------------|------------|
-| 0    | Nov 11 – Nov 17    | Vectorized core system                   | • 6 institutional signals (momentum + mean-reversion)<br>• Fully vectorized PaperTrader<br>• Elite ensemble with thresholds | DONE       |
-| 1    | Nov 18 – Nov 24    | Walk-forward & out-of-sample proof       | • Walk-forward engine (10–15 rolling windows)<br>• Full 1990–2025 performance report<br>• Equity curves per window<br>• “No curve-fitting” proof + permutation test | In Progress |
-| 2    | Nov 25 – Dec 1     | Futures-ready + volatility targeting     | • Strategy running on ES, NQ, GC, CL, etc.<br>• Volatility targeting (10–12% annualized)<br>• Margin, leverage, contract rollover logic | Pending    |
-| 3    | Dec 2 – Dec 8      | Live paper-trading infrastructure        | • Daily automated signal generator<br>• CSV → signal → plot → log pipeline<br>• Telegram / email alerts<br>• Daily performance dashboard | Pending    |
-| 4    | Dec 9 – Dec 15     | First real-money deployment (optional)   | • $10k–$100k live account (IBKR / Rithmic / CQG)<br>• Fully automated execution<br>• Kill switches & monitoring<br>• First live P&L | Pending    |
+| Week | Dates         | Main Goal                                  | Key Deliverables                                                                                                         | Difficulty   | Status   |
+|------|---------------|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------|--------------|----------|
+| 0    | Nov 11–17     | Core vectorized system                     | 6 institutional signals + fully vectorized PaperTrader + elite ensemble                                               | Medium       | Done     |
+| 1    | Nov 18–24     | Walk-forward Truth Engine                  | • Anchored rolling walk-forward (10y train / 5y test) <br>• Full 1990–2025 OOS report + stitched equity curve <br>• Permutation test skeleton | Medium-Hard  | Done     |
+| 2    | Nov 25–Dec 1  | In-sample Excellence + Optimization        | Parameter optimization (grid / Bayesian / random search) inside each training window → best params per regime        | Medium       | Pending  |
+| 3    | Dec 2–8       | Risk & Position Sizing Revolution          | • Volatility targeting (10–12% annualized) <br>• Kelly / Fractional Kelly <br>• Dynamic bet sizing                    | Medium       | Pending  |
+| 4    | Dec 9–15      | Realistic Execution Modeling              | • Advanced slippage model (especially shorts & low-liquidity) <br>• Partial fills / order queue simulation <br>• Margin & leverage constraints | Hard         | Pending  |
+| 5    | Dec 16–22     | Statistical Rigor & Overfitting Proof      | • In-sample + walk-forward permutation tests <br>• Monte Carlo regime shuffling <br>• Full execution analysis framework | Hard         | Pending  |
+| 6    | Dec 23–29     | Multi-Asset Futures Migration              | • Full switch to futures (ES, NQ, GC, CL, TY, etc.) <br>• Contract rollover logic <br>• Continuous adjusted prices      | Medium-Hard  | Pending  |
+| 7    | Dec 30–Jan 5  | Signal Zoo + Regime-Aware Ensemble         | Add new signals: <br>• Volatility regime <br>• Seasonality (TOM, Friday) <br>• Volume/liquidity breakouts <br>• Smart ensemble weighting | Medium       | Pending  |
+| 8    | Jan 6–12      | Final Report + Go / No-Go Decision         | • Master dashboard (all assets, all periods) <br>• Final walk-forward results across 5+ futures <br>• Statistical significance report <br>• “Deploy or Kill” decision framework | Easy         | Pending  |
+
+**Next Action (Week 2):**  
+Parameter optimization inside each training window → turn –0.04% CAGR into +12–18% CAGR with zero look-ahead bias.
+
+When you're ready, just say:  
+**“Week 2 starts now.”**
+
+Copy → paste → own your future.
 
 
 - [ ] Slippage model         Especially on shorts or low-liquidity           Easy

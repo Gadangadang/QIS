@@ -1,17 +1,3 @@
-# QuantTrading
-
-## Goal
-Build a modular and reproducible quantitative strategy for paper trading, with the goal to demonstrate alpha generation over time in backtesting and daily execution preferably on multiple asset classes.
-
-## Modules
-- `signals/`: Signal Generation
-- `utils/`: metrics and logger
-- `live/`: Daily run and execution
-- `backtest/`: Historic backtests and evaluation
-- `logs/`: Daily results
-
-
-<!-- EXTENDED README START -->
 How the pieces work together (detailed)
 
 This project is organized as a layered pipeline: signal generation → execution simulator → orchestration/CLI → diagnostics. The following explains how the main modules interact and how to run experiments or daily paper runs with the current unified CLI and helper scripts.
@@ -83,4 +69,4 @@ source .venv/bin/activate
 pip install -r requirements.txt  # or `pip install pandas numpy matplotlib`
 ```
 
-
+If you'd like, I can add a short `requirements.txt` and a README section that walks through creating the venv and example commands.

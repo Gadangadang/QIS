@@ -1,0 +1,83 @@
+=== Walk-forward diagnostics ===
+
+-- Worst strategy days (date, strategy_return, market_return) --
+2020-12-03  -0.265964  market=-0.2659643723737942
+2009-10-02  -0.245555  market=-0.2452554744525547
+2020-01-04  -0.220318  market=-0.22031812156788486
+2019-03-01  -0.213880  market=-0.21387970069687529
+2024-12-01  -0.206975  market=-0.2069746932388212
+2024-09-01  -0.206660  market=-0.20666028414454743
+2021-05-01  -0.203671  market=-0.20367086173372367
+2024-08-01  -0.202501  market=-0.20250121377509173
+2021-06-01  -0.202108  market=-0.20210750399148486
+2020-07-04  -0.200829  market=-0.2008294016888541
+2021-11-01  -0.193633  market=-0.1936332767402377
+2013-07-01  -0.190128  market=-0.19012797074954288
+2013-03-01  -0.189627  market=-0.18962740851796323
+2019-07-01  -0.189517  market=-0.18951651355732868
+2013-10-01  -0.185965  market=-0.18596549435965504
+2021-04-01  -0.184580  market=-0.1845804688877137
+2021-08-01  -0.183942  market=-0.18394213535888032
+2020-11-03  -0.183573  market=-0.18357257728274468
+2013-11-01  -0.183402  market=-0.18340175302341058
+2013-04-01  -0.183099  market=-0.18309937611408203
+2021-12-01  -0.182415  market=-0.18241455703009063
+2020-02-04  -0.182286  market=-0.1822859361853601
+2019-02-01  -0.181584  market=-0.18158400991228932
+2019-04-01  -0.181463  market=-0.18146256304151034
+2016-10-02  -0.180394  market=-0.18039389245408272
+2024-05-01  -0.177753  market=-0.17775338763349663
+2024-04-01  -0.177416  market=-0.1774159026235363
+2024-03-01  -0.175974  market=-0.17597389632089444
+2016-09-02  -0.175407  market=-0.17540735464339766
+2013-09-01  -0.174856  market=-0.17485598102338187
+
+-- Stitched equity summary --
+stitched_start: 100527.63369701305  stitched_end: 750.3736470246936  n=2404
+
+-- Worst trades (file,entry->exit,side,pnl_pct) --
+logs/walkforward/trades_fold_2.csv  2020-02-07 -> 2020-03-04  long  -0.20488817891373812
+logs/walkforward/trades_fold_2.csv  2020-05-08 -> 2020-06-04  long  -0.19956127171104043
+logs/walkforward/trades_fold_2.csv  2020-11-06 -> 2020-12-03  long  -0.17371173511875027
+logs/walkforward/trades_fold_2.csv  2020-01-06 -> 2020-02-04  long  -0.17305363746441071
+logs/walkforward/trades_fold_2.csv  2020-06-07 -> 2020-07-04  long  -0.16363178916249954
+logs/walkforward/trades_fold_2.csv  2023-02-08 -> 2023-03-01  long  -0.1527122628445582
+logs/walkforward/trades_fold_2.csv  2016-09-08 -> 2016-10-02  long  -0.1511665215199155
+logs/walkforward/trades_fold_2.csv  2019-12-04 -> 2020-01-04  long  -0.15027172043750436
+logs/walkforward/trades_fold_2.csv  2020-08-07 -> 2020-09-03  long  -0.13353733556263614
+logs/walkforward/trades_fold_2.csv  2016-08-07 -> 2016-09-02  long  -0.13038170806141136
+logs/walkforward/trades_fold_2.csv  2020-09-07 -> 2020-11-03  long  -0.13029408965451594
+logs/walkforward/trades_fold_2.csv  2020-03-08 -> 2020-05-05  long  -0.12936320038851445
+logs/walkforward/trades_fold_2.csv  2020-07-07 -> 2020-08-04  long  -0.12567958541315616
+logs/walkforward/trades_fold_2.csv  2022-04-05 -> 2022-04-10  long  -0.11842322512830894
+logs/walkforward/trades_fold_2.csv  2016-06-09 -> 2016-07-01  long  -0.11131946032471995
+logs/walkforward/trades_fold_2.csv  2019-08-04 -> 2019-09-01  long  -0.10732785413357282
+logs/walkforward/trades_fold_2.csv  2019-06-06 -> 2019-07-01  long  -0.10332336908739237
+logs/walkforward/trades_fold_2.csv  2022-07-01 -> 2022-07-03  long  -0.10175539875988882
+logs/walkforward/trades_fold_2.csv  2019-10-05 -> 2019-11-01  long  -0.09894495731241759
+logs/walkforward/trades_fold_2.csv  2019-09-05 -> 2019-10-01  long  -0.0954819382032257
+logs/walkforward/trades_fold_2.csv  2016-11-07 -> 2016-12-01  long  -0.09287853265955448
+logs/walkforward/trades_fold_2.csv  2016-02-06 -> 2016-03-02  long  -0.09157839737804596
+logs/walkforward/trades_fold_2.csv  2016-07-06 -> 2016-08-01  long  -0.09000520808673829
+logs/walkforward/trades_fold_2.csv  2023-01-08 -> 2023-02-02  long  -0.08673660014901452
+logs/walkforward/trades_fold_1.csv  2012-05-04 -> 2012-06-01  long  -0.08604534725699164
+logs/walkforward/trades_fold_2.csv  2022-07-09 -> 2022-07-10  long  -0.08548269164570699
+logs/walkforward/trades_fold_1.csv  2010-07-12 -> 2011-08-08  long  -0.08522634417388464
+logs/walkforward/trades_fold_2.csv  2022-10-03 -> 2022-10-06  long  -0.08420197580948097
+logs/walkforward/trades_fold_2.csv  2016-10-06 -> 2016-11-01  long  -0.08224798435189151
+logs/walkforward/trades_fold_2.csv  2016-01-04 -> 2016-02-02  long  -0.08191817830953307
+
+-- Trades with entry/exit on worst strategy dates (exact match) --
+logs/walkforward/trades_fold_1.csv  2009-10-02 -> 2009-10-02  long  pnl_pct=0.0
+logs/walkforward/trades_fold_2.csv  2016-08-07 -> 2016-09-02  long  pnl_pct=-0.13038170806141136
+logs/walkforward/trades_fold_2.csv  2016-09-08 -> 2016-10-02  long  pnl_pct=-0.1511665215199155
+logs/walkforward/trades_fold_2.csv  2016-12-07 -> 2019-04-01  long  pnl_pct=0.17647878816040152
+logs/walkforward/trades_fold_2.csv  2019-06-06 -> 2019-07-01  long  pnl_pct=-0.10332336908739237
+logs/walkforward/trades_fold_2.csv  2019-12-04 -> 2020-01-04  long  pnl_pct=-0.15027172043750436
+logs/walkforward/trades_fold_2.csv  2020-01-06 -> 2020-02-04  long  pnl_pct=-0.17305363746441071
+logs/walkforward/trades_fold_2.csv  2020-06-07 -> 2020-07-04  long  pnl_pct=-0.16363178916249954
+logs/walkforward/trades_fold_2.csv  2020-09-07 -> 2020-11-03  long  pnl_pct=-0.13029408965451594
+logs/walkforward/trades_fold_2.csv  2020-11-06 -> 2020-12-03  long  pnl_pct=-0.17371173511875027
+logs/walkforward/trades_fold_2.csv  2024-01-02 -> 2024-03-01  long  pnl_pct=-0.04104610706067213
+
+Diagnostics saved to: logs/walkforward/diagnostics.txt
