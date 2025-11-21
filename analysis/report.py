@@ -1,4 +1,5 @@
 """Unified backtest reporting with metrics, charts, and HTML output."""
+import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
