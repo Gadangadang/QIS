@@ -123,6 +123,11 @@ def run_walk_forward(
         step = test_size
 
     Path(save_dir).mkdir(parents=True, exist_ok=True)
+    
+    # Initialize signal columns in df if they don't exist
+    for col in ['Position', 'Momentum', 'Z', 'EnsemblePosition', 'TrendFilter']:
+        if col not in df.columns:
+            df[col] = np.nan
 
     n = len(df)
     starts = list(range(0, n - train_size - test_size + 1, step))
@@ -151,6 +156,12 @@ def run_walk_forward(
 
         # generate signals on test_with_history (indicators need history)
         test_signals = sig.generate(test_with_history)
+        
+        # Store the generated signals back into the main df for diagnostics
+        # Only update the test window portion
+        for col in ['Position', 'Momentum', 'Z', 'EnsemblePosition', 'TrendFilter']:
+            if col in test_signals.columns:
+                df.loc[test_signals.index, col] = test_signals[col]
 
         # run paper trader but only count from test_only start
         trader = PaperTrader(initial_cash=initial_cash)
@@ -251,10 +262,17 @@ def run_walk_forward(
         # NEW: Auto-generate report if save_dir provided
         try:
             from analysis.report import BacktestReport
+            from analysis.diagnostics import ModelDiagnostics
 
             report = BacktestReport(res)
             report.save_html(save_path / 'report.html')
             report.summary()  # Print to console
+            
+            # NEW: Generate diagnostics report
+            diag = ModelDiagnostics(res)
+            diag.save_report(save_path / 'diagnostics.txt')
+            print(f"\n📊 Diagnostics saved to: {save_path / 'diagnostics.txt'}")
+            
         except Exception as e:
             print(f"Warning: Could not generate report: {e}")
 

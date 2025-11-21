@@ -348,6 +348,9 @@ class BacktestReport:
         worst_days_html = self._worst_days_to_html()
         worst_trades_html = self._worst_trades_to_html()
         folds_html = self._folds_to_html()
+        
+        # Generate diagnostic charts if diagnostics module available
+        diagnostics_html = self._generate_diagnostics_html()
 
         full_html = f"""
 <!DOCTYPE html>
@@ -382,6 +385,8 @@ class BacktestReport:
 
         <h2>Interactive Charts</h2>
         {pio.to_html(fig, include_plotlyjs='cdn', full_html=False)}
+
+        {diagnostics_html}
 
         <h2>Worst Days (Top 10)</h2>
         {worst_days_html}
@@ -529,3 +534,176 @@ class BacktestReport:
         )
 
         return fig
+
+    def _generate_diagnostics_html(self) -> str:
+        """Generate diagnostic charts HTML section.
+        
+        Returns HTML with regime breakdown, trade anatomy, and signal quality visualizations.
+        """
+        try:
+            from analysis.diagnostics import ModelDiagnostics
+            from plotly import graph_objects as go
+            from plotly.subplots import make_subplots
+            import plotly.io as pio
+        except ImportError:
+            return ""
+        
+        try:
+            diag = ModelDiagnostics(self.results)
+            
+            html_sections = []
+            html_sections.append('<h2>Model Diagnostics</h2>')
+            
+            # Signal Quality Section
+            signal_quality = diag.signal_quality_report()
+            if 'error' not in signal_quality:
+                signal_html = '<h3>Signal Quality Analysis</h3><table>'
+                for key, value in signal_quality.items():
+                    label = key.replace('_', ' ').title()
+                    if isinstance(value, float):
+                        val_str = f"{value:.4f}"
+                    else:
+                        val_str = str(value)
+                    signal_html += f"<tr><td>{label}</td><td class='metric-value'>{val_str}</td></tr>"
+                signal_html += '</table>'
+                html_sections.append(signal_html)
+            
+            # Regime Breakdown Section
+            regime_stats = diag.regime_breakdown()
+            if not regime_stats.empty and 'regime' in regime_stats.columns:
+                regime_df = regime_stats.set_index('regime')
+                
+                html_sections.append('<h3>Regime Performance</h3>')
+                html_sections.append(regime_df.to_html(float_format=lambda x: f'{x:.4f}'))
+                
+                # Create regime charts
+                fig_regime = make_subplots(
+                    rows=2, cols=2,
+                    subplot_titles=('Sharpe by Regime', 'Total Return by Regime', 
+                                  'Max Drawdown by Regime', 'Days in Each Regime')
+                )
+                
+                # Sharpe
+                fig_regime.add_trace(
+                    go.Bar(x=regime_df.index, y=regime_df['sharpe'], name='Sharpe', 
+                          marker_color='lightblue'),
+                    row=1, col=1
+                )
+                
+                # Total Return
+                fig_regime.add_trace(
+                    go.Bar(x=regime_df.index, y=regime_df['total_return'] * 100, name='Total Return (%)',
+                          marker_color='lightgreen'),
+                    row=1, col=2
+                )
+                
+                # Max Drawdown
+                fig_regime.add_trace(
+                    go.Bar(x=regime_df.index, y=regime_df['max_drawdown'] * 100, name='Max DD (%)',
+                          marker_color='lightcoral'),
+                    row=2, col=1
+                )
+                
+                # Days
+                fig_regime.add_trace(
+                    go.Bar(x=regime_df.index, y=regime_df['n_days'], name='Days',
+                          marker_color='lightyellow'),
+                    row=2, col=2
+                )
+                
+                fig_regime.update_layout(height=600, showlegend=False, title_text="Regime Analysis")
+                html_sections.append(pio.to_html(fig_regime, include_plotlyjs=False, full_html=False))
+            
+            # Trade Anatomy Section
+            trade_anatomy = diag.trade_anatomy()
+            if 'error' not in trade_anatomy:
+                html_sections.append('<h3>Trade Anatomy</h3>')
+                
+                # Trade stats table
+                trades_df = self.results.get('trades', pd.DataFrame())
+                long_trades = len(trades_df[trades_df['side'] == 'long']) if 'side' in trades_df.columns else 0
+                short_trades = len(trades_df[trades_df['side'] == 'short']) if 'side' in trades_df.columns else 0
+                
+                stats_html = '<table>'
+                stats_html += f"<tr><td>Total Trades</td><td class='metric-value'>{trade_anatomy['total_trades']}</td></tr>"
+                stats_html += f"<tr><td>Win Rate</td><td class='metric-value'>{trade_anatomy['win_rate']:.1%}</td></tr>"
+                stats_html += f"<tr><td>Avg Hold (Winners)</td><td class='metric-value'>{trade_anatomy['avg_hold_days_wins']:.1f} days</td></tr>"
+                stats_html += f"<tr><td>Avg Hold (Losers)</td><td class='metric-value'>{trade_anatomy['avg_hold_days_losses']:.1f} days</td></tr>"
+                stats_html += f"<tr><td>Long Trades</td><td class='metric-value'>{long_trades}</td></tr>"
+                stats_html += f"<tr><td>Long Win Rate</td><td class='metric-value'>{trade_anatomy['long_win_rate']:.1%}</td></tr>"
+                stats_html += f"<tr><td>Short Trades</td><td class='metric-value'>{short_trades}</td></tr>"
+                stats_html += f"<tr><td>Short Win Rate</td><td class='metric-value'>{trade_anatomy['short_win_rate']:.1%}</td></tr>"
+                stats_html += '</table>'
+                html_sections.append(stats_html)
+                
+                # Trade anatomy charts
+                fig_trades = make_subplots(
+                    rows=2, cols=2,
+                    subplot_titles=('Exit Reasons', 'Hold Period: Winners vs Losers',
+                                  'Win Rate: Long vs Short', 'Trade Count: Long vs Short'),
+                    specs=[[{'type': 'pie'}, {'type': 'bar'}],
+                          [{'type': 'bar'}, {'type': 'bar'}]]
+                )
+                
+                # Exit reasons pie
+                if trade_anatomy['exit_reasons']:
+                    labels = list(trade_anatomy['exit_reasons'].keys())
+                    values = list(trade_anatomy['exit_reasons'].values())
+                    fig_trades.add_trace(
+                        go.Pie(labels=labels, values=values, name='Exit Reasons'),
+                        row=1, col=1
+                    )
+                
+                # Hold period comparison
+                fig_trades.add_trace(
+                    go.Bar(x=['Winners', 'Losers'], 
+                          y=[trade_anatomy['avg_hold_days_wins'], trade_anatomy['avg_hold_days_losses']],
+                          marker_color=['green', 'red']),
+                    row=1, col=2
+                )
+                
+                # Win rates
+                fig_trades.add_trace(
+                    go.Bar(x=['Long', 'Short'],
+                          y=[trade_anatomy['long_win_rate'] * 100, trade_anatomy['short_win_rate'] * 100],
+                          marker_color=['green', 'red']),
+                    row=2, col=1
+                )
+                
+                # Trade counts
+                fig_trades.add_trace(
+                    go.Bar(x=['Long', 'Short'],
+                          y=[long_trades, short_trades],
+                          marker_color=['green', 'red']),
+                    row=2, col=2
+                )
+                
+                fig_trades.update_layout(height=700, showlegend=False, title_text="Trade Analysis")
+                fig_trades.update_yaxes(title_text="Days", row=1, col=2)
+                fig_trades.update_yaxes(title_text="Win Rate (%)", row=2, col=1)
+                fig_trades.update_yaxes(title_text="Count", row=2, col=2)
+                
+                html_sections.append(pio.to_html(fig_trades, include_plotlyjs=False, full_html=False))
+            
+            # Execution Leakage Section
+            leakage = diag.execution_leakage()
+            html_sections.append('<h3>Execution Leakage Analysis</h3>')
+            leak_html = '<table>'
+            leak_html += f"<tr><td>Theoretical Sharpe (perfect execution)</td><td class='metric-value'>{leakage['theoretical_sharpe']:.4f}</td></tr>"
+            leak_html += f"<tr><td>Actual Sharpe (with stops/costs)</td><td class='metric-value'>{leakage['actual_sharpe']:.4f}</td></tr>"
+            leak_html += f"<tr><td>Execution Leakage</td><td class='metric-value'>{leakage['leakage_pct']:.1f}%</td></tr>"
+            leak_html += '</table>'
+            
+            if leakage['leakage_pct'] > 20:
+                leak_html += '<p style="color: orange;">HIGH LEAKAGE: Execution costs/stops significantly hurt performance</p>'
+            elif leakage['leakage_pct'] < -10:
+                leak_html += '<p style="color: green;">POSITIVE IMPACT: Risk controls improved risk-adjusted returns</p>'
+            else:
+                leak_html += '<p style="color: green;">LOW LEAKAGE: Execution close to theoretical performance</p>'
+            
+            html_sections.append(leak_html)
+            
+            return '\n'.join(html_sections)
+            
+        except Exception as e:
+            return f'<p>⚠️ Could not generate diagnostics: {str(e)}</p>'

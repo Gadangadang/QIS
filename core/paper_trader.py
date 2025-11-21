@@ -150,7 +150,8 @@ class PaperTrader:
                 if triggered:
                     # apply exit by setting tomorrow's executed position to 0 (if exists)
                     entry_label = df.index[entry_idx] if entry_idx is not None else None
-                    exit_label = df.index[i]
+                    trigger_label = df.index[i]  # Day when stop/take/max-hold triggered
+                    
                     # if using intraday mode, record exit price so we can adjust today's strategy
                     if stop_mode in ("low", "open"):
                         # assume fill at the stop price level (entry*(1-stop)) for long, symmetric for short
@@ -158,13 +159,19 @@ class PaperTrader:
                             exit_price = entry_price * (1 - float(per_stop)) if per_stop is not None else df.at[idx, "Close"]
                         else:
                             exit_price = entry_price * (1 + float(per_stop)) if per_stop is not None else df.at[idx, "Close"]
-                        intraday_exit_map[exit_label] = exit_price
+                        intraday_exit_map[trigger_label] = exit_price
+                    
+                    # Record exit reason with BOTH trigger date and actual exit date for robust matching
                     if i + 1 < len(df):
                         exec_series.iloc[i + 1] = 0
-                        exit_reasons_map[(entry_label, exit_label)] = reason
+                        actual_exit_label = df.index[i + 1]  # Actual exit date (next day)
+                        # Store with both keys for robust lookup
+                        exit_reasons_map[(entry_label, trigger_label)] = reason
+                        exit_reasons_map[(entry_label, actual_exit_label)] = reason
                     else:
                         # last row: mark exit on this index
-                        exit_reasons_map[(entry_label, exit_label)] = reason
+                        exit_reasons_map[(entry_label, trigger_label)] = reason
+                    
                     # reset current trade state
                     current_pos = 0
                     entry_idx = None
@@ -253,21 +260,27 @@ class PaperTrader:
 
             pnl_pct = (exit_price / entry_price - 1) * np.sign(entry_pos)
 
-            # try to annotate exit reason if we recorded a triggered exit
+            # Annotate exit reason with improved matching logic
+            exit_reason = None
             try:
-                # lookup by index labels (timestamps)
+                # Direct lookup (most common case)
                 exit_reason = exit_reasons_map.get((entry_date, exit_date), None)
-                # fallback: sometimes the recorded exit label (trigger day) and the
-                # trade-detected exit_date can be off by one day due to how we
-                # set exec_series[i+1]=0 when triggering an exit. Try matching by
-                # entry_date alone as a robust fallback so exit reasons are not
-                # lost when the pair key differs by one day.
+                
+                # Fallback 1: Check the day before exit_date (for i+1 offset)
+                if exit_reason is None and len(df.index) > 1:
+                    prev_date_idx = df.index.get_loc(exit_date)
+                    if prev_date_idx > 0:
+                        prev_date = df.index[prev_date_idx - 1]
+                        exit_reason = exit_reasons_map.get((entry_date, prev_date), None)
+                
+                # Fallback 2: Match by entry_date alone (last resort)
                 if exit_reason is None:
                     for (k_entry, k_exit), r in exit_reasons_map.items():
                         if k_entry == entry_date:
                             exit_reason = r
                             break
-            except Exception:
+            except Exception as e:
+                # If all fails, leave as None (natural signal exit)
                 exit_reason = None
 
             trades.append(
