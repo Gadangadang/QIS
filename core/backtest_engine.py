@@ -9,6 +9,7 @@ from signals.mean_reversion import MeanReversionSignal
 from signals.ensemble import EnsembleSignal
 from analysis.metrics import max_drawdown, sharpe_ratio
 from core.paper_trader import PaperTrader
+from core.optimizer import ParameterOptimizer
 
 
 def split_train_test(df: pd.DataFrame, train_frac: float = 0.6, lookback: int = 20):
@@ -83,6 +84,59 @@ def run_train_test(
         "trader": trader,
         "summary": summary,
     }
+    
+def run_single_fold_backtest(
+    signal,
+    train_df,
+    test_df,  # Changed from test_only
+    lookback,
+    initial_cash,
+    transaction_cost,
+    stop_loss_pct,
+    take_profit_pct,
+    max_hold_days,
+    stop_mode,
+    max_position_pct, 
+):
+    """
+    Run a single backtest on train/test data (used for optimization).
+    Returns dict with metrics: {'sharpe': ..., 'total_return': ..., etc}
+    """
+    # Generate signals on test data
+    hist_start = max(0, len(train_df) - lookback)
+    test_with_history = pd.concat([train_df.iloc[hist_start:], test_df])
+    test_signals = signal.generate(test_with_history)
+    
+    # Run paper trader on test window only
+    trader = PaperTrader(initial_cash=initial_cash)
+    result_df = trader.simulate(
+        test_signals,
+        position_col="Position",
+        start_date=test_df.index[0],
+        end_date=test_df.index[-1],
+        transaction_cost=transaction_cost,
+        stop_loss_pct=stop_loss_pct,
+        take_profit_pct=take_profit_pct,
+        max_hold_days=max_hold_days,
+        stop_mode=stop_mode,
+        max_position_pct=max_position_pct,
+    )
+    
+    # Return metrics
+    summary = trader.summary()
+    num_trades = summary.get('n_trades', 0)  # Fixed: use 'n_trades' not 'Num Trades'
+    
+    # Debug: print if no trades
+    if num_trades == 0:
+        print(f"  ⚠️  Validation generated 0 trades (window: {test_df.index[0]} to {test_df.index[-1]}, {len(test_df)} days)")
+    
+    return {
+        'sharpe': summary.get('sharpe', 0),
+        'total_return': summary.get('total_return_pct', 0),
+        'max_drawdown': summary.get('max_drawdown_pct', 0),
+        'win_rate': summary.get('win_rate', 0),
+        'num_trades': num_trades,
+    }
 
 
 def run_walk_forward(
@@ -100,6 +154,9 @@ def run_walk_forward(
     max_hold_days: Optional[int] = None,
     stop_mode: str = "close",
     max_position_pct: float = 1.0,
+    optimize_per_fold: bool = False,
+    param_grid: Optional[dict] = None,
+    optimization_metric: str = "sharpe",
 ):
     """Run an anchored walk-forward backtest.
 
@@ -113,6 +170,14 @@ def run_walk_forward(
         initial_cash: starting capital used for stitching equity
         transaction_cost: per-trade cost in bps (e.g. 3 -> 0.03%) passed to PaperTrader
         save_dir: directory to save per-fold trades and stitched equity
+        stop_loss_pct:
+        take_profit_pct:
+        max_hold_days: 
+        stop_mode: 
+        max_position_pct: 
+        optimize_per_fold: 
+        param_grid: 
+        optimization_metric:
 
     Returns:
         dict with keys: "stitched_equity" (pd.Series), "combined_returns" (pd.Series), "folds" (list of fold summaries), "overall" (summary dict)
@@ -125,7 +190,7 @@ def run_walk_forward(
     Path(save_dir).mkdir(parents=True, exist_ok=True)
     
     # Initialize signal columns in df if they don't exist
-    for col in ['Position', 'Momentum', 'Z', 'EnsemblePosition', 'TrendFilter']:
+    for col in ['Position', 'Momentum', 'Z', 'Ensemble', 'TrendFilter']:
         if col not in df.columns:
             df[col] = np.nan
 
@@ -137,6 +202,7 @@ def run_walk_forward(
     combined_returns = []
     fold_summaries = []
     all_trades = []  # NEW: Collect all trades from all folds
+    fold_params = {}
 
     prev_last_value = initial_cash
 
@@ -151,15 +217,89 @@ def run_walk_forward(
         test_with_history = df.iloc[hist_start:test_end].copy()
         test_only = df.iloc[test_start:test_end].copy()
 
-        # create a fresh signal instance
-        sig = signal_factory() if callable(signal_factory) else signal_factory
+        if optimize_per_fold and param_grid:
+            # Split training data into train/validation (80/20)
+            train_size_inner = int(len(train_df) * 0.8)
+            train_inner = train_df.iloc[:train_size_inner].copy()
+            val_inner = train_df.iloc[train_size_inner:].copy()
+            
+            if fold_idx == 1:
+                print(f"\nOptimization Setup:")
+                print(f"  Training window: {train_df.index[0].date()} to {train_df.index[-1].date()} ({len(train_df)} rows)")
+                print(f"  → Train split: {train_inner.index[0].date()} to {train_inner.index[-1].date()} ({len(train_inner)} rows)")
+                print(f"  → Val split: {val_inner.index[0].date()} to {val_inner.index[-1].date()} ({len(val_inner)} rows)")
+                print(f"  Test window: {test_only.index[0].date()} to {test_only.index[-1].date()} ({len(test_only)} rows)")
+            
+            # Separate signal params from execution params
+            signal_param_names = {'lookback', 'entry_threshold', 'exit_threshold', 'window', 'entry_z', 'exit_z'}
+            execution_param_names = {'stop_loss_pct', 'take_profit_pct', 'max_hold_days'}
+            
+            signal_params = {k: v for k, v in param_grid.items() if k in signal_param_names}
+            execution_params = {k: v for k, v in param_grid.items() if k in execution_param_names}
+            
+            def objective_fn(params):
+                # Split params into signal and execution
+                sig_params = {k: v for k, v in params.items() if k in signal_param_names}
+                exec_params = {k: v for k, v in params.items() if k in execution_param_names}
+                
+                # Create signal with signal params only
+                signal = signal_factory(**sig_params)
+                
+                # Use execution params in backtest (override defaults)
+                current_stop_loss = exec_params.get('stop_loss_pct', stop_loss_pct)
+                current_take_profit = exec_params.get('take_profit_pct', take_profit_pct)
+                current_max_hold = exec_params.get('max_hold_days', max_hold_days)
+                
+                # CRITICAL: Test on validation split, NOT test_only
+                return run_single_fold_backtest(
+                    signal=signal,
+                    train_df=train_inner,  # Train on first 80% of training data
+                    test_df=val_inner,     # Validate on last 20% of training data
+                    lookback=lookback,
+                    initial_cash=initial_cash,
+                    transaction_cost=transaction_cost,
+                    stop_loss_pct=current_stop_loss,
+                    take_profit_pct=current_take_profit,
+                    max_hold_days=current_max_hold,
+                    stop_mode=stop_mode,
+                    max_position_pct=max_position_pct,
+                )
+            
+            optimizer = ParameterOptimizer(
+                objective_fn=objective_fn,
+                param_grid=param_grid,
+                metric=optimization_metric,
+                maximize=True,
+                verbose=True
+            )
+            
+            best_params, best_score, _ = optimizer.grid_search()
+            fold_params[fold_idx] = best_params
+            
+            # Extract signal params for creating the signal
+            best_signal_params = {k: v for k, v in best_params.items() if k in signal_param_names}
+            best_execution_params = {k: v for k, v in best_params.items() if k in execution_param_names}
+            
+            sig = signal_factory(**best_signal_params)
+            
+            # Override execution params for this fold if optimized
+            if 'stop_loss_pct' in best_execution_params:
+                stop_loss_pct = best_execution_params['stop_loss_pct']
+            if 'take_profit_pct' in best_execution_params:
+                take_profit_pct = best_execution_params['take_profit_pct']
+            if 'max_hold_days' in best_execution_params:
+                max_hold_days = best_execution_params['max_hold_days']
+            
+        else:
+            # create a fresh signal instance
+            sig = signal_factory() if callable(signal_factory) else signal_factory
 
         # generate signals on test_with_history (indicators need history)
         test_signals = sig.generate(test_with_history)
         
         # Store the generated signals back into the main df for diagnostics
         # Only update the test window portion
-        for col in ['Position', 'Momentum', 'Z', 'EnsemblePosition', 'TrendFilter']:
+        for col in ['Position', 'Momentum', 'Z', 'Ensemble', 'TrendFilter']:
             if col in test_signals.columns:
                 df.loc[test_signals.index, col] = test_signals[col]
 

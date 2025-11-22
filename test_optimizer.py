@@ -130,10 +130,10 @@ def test_grid_search_full():
     print("=" * 80)
     
     param_grid = {
-        'lookback': [200, 250],
-        'entry_threshold': [0.01, 0.02, 0.03],
-        'exit_threshold': [-0.01, -0.02],
-        'stop_loss_pct': [0.08, 0.10, 0.12]
+        'entry_threshold': [0.01, 0.02, 0.03, 0.4],
+        'exit_threshold': [-0.01, -0.02, -0.03],
+        'lookback': [100, 150, 200, 250, 300],
+        'stop_loss_pct': [0.05, 0.08, 0.10, 0.12, 0.15]
     }
     
     optimizer = ParameterOptimizer(
@@ -198,10 +198,10 @@ def test_random_search():
 
 if __name__ == '__main__':
     # Start with small grid search
-    test_grid_search_small()
+    #test_grid_search_small()
     
     # Uncomment to run more extensive tests:
-    # test_grid_search_full()
+    test_grid_search_full()
     # test_random_search()
     
     print("\n" + "=" * 80)

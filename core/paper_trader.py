@@ -222,13 +222,28 @@ class PaperTrader:
         # 5. Date filtering
         if start_date is not None:
             start_date = pd.to_datetime(start_date)
+            # Zero out strategy returns before start_date
             df.loc[df.index < start_date, "Strategy"] = 0
         if end_date is not None:
             end_date = pd.to_datetime(end_date)
             df = df.loc[df.index <= end_date]
 
-        # 6. Portfolio value computation
-        df["PortfolioValue"] = (1 + df["Strategy"]).cumprod() * self.initial_cash
+        # 6. Portfolio value computation (AFTER date filtering to avoid compounding historical data)
+        # Reset cumulative product to start fresh from start_date
+        if start_date is not None:
+            # Find the first index on or after start_date
+            mask = df.index >= start_date
+            if mask.any():
+                first_idx = df.index[mask][0]
+                # Compute portfolio value only from start_date forward
+                df["PortfolioValue"] = self.initial_cash
+                df.loc[df.index >= first_idx, "PortfolioValue"] = (
+                    (1 + df.loc[df.index >= first_idx, "Strategy"]).cumprod() * self.initial_cash
+                )
+            else:
+                df["PortfolioValue"] = self.initial_cash
+        else:
+            df["PortfolioValue"] = (1 + df["Strategy"]).cumprod() * self.initial_cash
         """print(f"Strategy returns range: min {df['Strategy'].min():.4f}, max {df['Strategy'].max():.4f}")
         print(f"Any returns > 0.5? { (df['Strategy'] > 0.5).sum() } days")
         exit()"""
