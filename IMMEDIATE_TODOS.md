@@ -204,40 +204,198 @@
 2. ✅ Create IMMEDIATE_TODOS.md with roadmap
 3. ✅ Organize repo structure (test scripts to scripts/)
 
-### Day 2: Performance Optimization ⚡ **PRIORITY**
-**Goal: 10-year, 3-asset backtest in <5 seconds**
+### Day 2: Performance Optimization + Reporting ⚡ **IN PROGRESS**
+**Goal: 10-year, 3-asset backtest in <5 seconds + HTML reporting**
 
-1. Profile current code to identify bottlenecks
+#### Morning: Profiling & Bottleneck Analysis
+1. **Profile current code execution**
+   ```python
+   # Create scripts/profile_backtest.py
+   import cProfile
+   import pstats
+   # Profile 10-year, 3-asset backtest
+   # Identify top 20 slowest functions
+   ```
    - Time each component: data loading, signal generation, portfolio calculations
-   - Identify bar-by-bar loops that can be vectorized
-   
-2. Vectorize portfolio_manager.py
-   - Replace position calculation loops with pandas operations
-   - Vectorize rebalancing logic where possible
-   - Optimize equity curve generation
-   
-3. Add timing and progress indicators
-   - Add @timing decorator to key functions
-   - Progress bars for walk-forward folds
-   - Memory profiling for large datasets
+   - Identify bar-by-bar loops in portfolio_manager.py
+   - Document baseline timing (before optimization)
 
-### Day 3-4: Walk-Forward for Multi-Strategy **PRIORITY**
+2. **Create timing decorator**
+   ```python
+   # Add to utils/logger.py
+   def timing_decorator(func):
+       """Decorator to measure execution time"""
+       # Log function name and execution time
+   ```
+
+#### Afternoon: Vectorization & Optimization
+3. **Vectorize portfolio_manager.py**
+   - **Target areas:**
+     - `calculate_positions()` - vectorize position sizing
+     - `apply_rebalancing()` - vectorize rebalancing logic
+     - `calculate_equity_curve()` - use cumulative operations
+     - Remove all `for date in dates:` loops
+   
+   - **Techniques:**
+     ```python
+     # Before: Loop
+     for i, date in enumerate(dates):
+         position[i] = capital * signal[i] / price[i]
+     
+     # After: Vectorized
+     positions = (capital * signals.shift(1) / prices).fillna(0)
+     ```
+
+4. **Add progress bars**
+   ```python
+   # Install tqdm: pip install tqdm
+   from tqdm import tqdm
+   
+   # Wrap walk-forward folds
+   for fold in tqdm(range(n_folds), desc="Walk-Forward Optimization"):
+       ...
+   ```
+
+#### Evening: Reporting Integration
+5. **Integrate BacktestReport into multi-asset system**
+   - Extend `analysis/report.py` to handle multi-asset portfolios
+   - Add methods:
+     - `generate_multi_asset_report()` - aggregate metrics across assets
+     - `plot_asset_allocation()` - stacked area chart
+     - `correlation_heatmap()` - signal and return correlations
+   
+6. **Update portfolio_manager.py output format**
+   - Ensure output matches BacktestReport expected format:
+     - `equity_curve`: pandas Series with DatetimeIndex
+     - `trades`: DataFrame with columns [entry_date, exit_date, ticker, pnl, ...]
+     - `returns`: Daily returns series
+   
+7. **Add HTML report generation to notebooks**
+   ```python
+   # Add to notebooks/05_multi_asset_demo.ipynb
+   from analysis.report import BacktestReport
+   
+   report = BacktestReport.from_multi_asset(
+       equity_curve=equity,
+       trades=trades,
+       prices=prices,
+       signals=signals
+   )
+   report.save_html('logs/multi_asset_report.html')
+   ```
+
+#### Success Criteria
+- [ ] Baseline profiling results documented
+- [ ] portfolio_manager.py vectorized (no bar-by-bar loops)
+- [ ] Timing decorator added and used on key functions
+- [ ] Progress bars working for walk-forward
+- [ ] <5 seconds for 10-year, 3-asset backtest
+- [ ] BacktestReport working with multi-asset portfolios
+- [ ] HTML reports generated from notebooks
+- [ ] Report includes: equity curve, allocation, correlations, metrics
+
+### Day 3-4: Walk-Forward Multi-Strategy Optimization **NEXT PRIORITY**
 **Goal: Optimize strategy selection and parameters per asset per period**
 
-1. Extend walk-forward optimizer to handle MultiStrategySignal
-   - Test different strategy combinations
-   - Optimize each asset's strategy independently
-   - Example: Try momentum vs mean reversion for each asset in each fold
-   
-2. Implement strategy selection optimization
-   - Which strategy (momentum/mean_reversion) works best for each asset?
-   - Different parameters per asset per period
-   - Track strategy allocation over time
-   
-3. Visualization and analysis
-   - Plot which strategy was selected when for each asset
-   - Compare walk-forward multi-strategy vs static allocation
-   - Analyze regime changes and strategy effectiveness
+#### Day 3 Morning: Extend Optimizer Architecture
+1. **Modify WalkForwardOptimizer to support MultiStrategySignal**
+   ```python
+   # core/optimizer.py
+   class MultiStrategyOptimizer(WalkForwardOptimizer):
+       def __init__(self, asset_param_grids, ...):
+           """
+           asset_param_grids = {
+               'ES': {'strategy': ['momentum'], 'lookback': [60, 90, 120]},
+               'NQ': {'strategy': ['momentum'], 'lookback': [60, 90, 120]},
+               'GC': {'strategy': ['momentum', 'mean_reversion'], 
+                      'window': [20, 50], 'entry_z': [1.5, 2.0]}
+           }
+           """
+   ```
+
+2. **Create strategy selection logic**
+   - Test all strategy combinations per asset
+   - Example: ES with momentum(60), NQ with momentum(120), GC with mean_reversion(50)
+   - Optimize each asset independently, then combine
+   - Track which strategy/params won each fold
+
+#### Day 3 Afternoon: Implement Per-Asset Optimization
+3. **Build per-asset parameter search**
+   ```python
+   def optimize_per_asset(self, fold_data):
+       """Optimize each asset separately, then combine"""
+       best_strategies = {}
+       
+       for ticker in self.tickers:
+           # Test momentum vs mean_reversion
+           momentum_result = self._test_strategy(
+               ticker, 'momentum', params, fold_data
+           )
+           mr_result = self._test_strategy(
+               ticker, 'mean_reversion', params, fold_data
+           )
+           
+           # Pick best strategy for this asset in this fold
+           best_strategies[ticker] = max(
+               momentum_result, mr_result, 
+               key=lambda x: x['sharpe']
+           )
+       
+       return best_strategies
+   ```
+
+4. **Track strategy allocation history**
+   - DataFrame columns: [fold, ticker, strategy, params, train_sharpe, test_sharpe]
+   - Save to `logs/strategy_selection_history.csv`
+
+#### Day 4 Morning: Integration & Testing
+5. **Integrate with PortfolioManager**
+   - Accept dict of strategies per fold
+   - Apply appropriate strategy for each asset in each period
+   - Handle strategy transitions smoothly
+
+6. **Create comprehensive test**
+   ```python
+   # scripts/test_multi_strategy_optimization.py
+   # Test on 15 years of data (ES, NQ, GC)
+   # 5 folds, optimize both strategy type and parameters
+   # Compare:
+   #   - All momentum (static)
+   #   - All mean reversion (static)
+   #   - Adaptive multi-strategy (optimized per fold)
+   ```
+
+#### Day 4 Afternoon: Visualization & Analysis
+7. **Create strategy allocation timeline**
+   ```python
+   def plot_strategy_allocation_over_time(history_df):
+       """
+       Timeline showing which strategy was used when for each asset
+       Stacked bar chart: fold x [ES, NQ, GC] x strategy_color
+       """
+   ```
+
+8. **Add to notebook (Section 15)**
+   - Show strategy selection process
+   - Visualize which strategies worked when
+   - Regime analysis: momentum in trends, mean reversion in ranges
+   - Compare static vs adaptive allocation performance
+
+9. **Performance attribution**
+   - Break down returns by: asset, strategy type, time period
+   - Answer: "Did adaptive strategy selection add value?"
+   - Statistical significance tests
+
+#### Success Criteria
+- [ ] MultiStrategyOptimizer class created and tested
+- [ ] Per-asset optimization working correctly
+- [ ] Strategy selection history tracked and saved
+- [ ] Integration with PortfolioManager complete
+- [ ] Test script validates all functionality
+- [ ] Visualization showing strategy allocation timeline
+- [ ] Notebook section 15 added with comprehensive analysis
+- [ ] Performance comparison: static vs adaptive
+- [ ] Can answer: "When did momentum work? When did mean reversion work?"
 
 ### Day 5-7: Polish and Additional Features
 1. Update README.md with quick start

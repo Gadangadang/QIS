@@ -1,327 +1,394 @@
 # QuantTrading
 
-A modular quantitative trading system for paper trading with walk-forward validation, comprehensive reporting, and notebook-first research workflow.
+A multi-asset, multi-strategy quantitative portfolio management system with walk-forward optimization, comprehensive risk controls, and production-ready backtesting infrastructure.
 
-## 🎯 Goal
+## 🎯 Overview
 
-Build a reproducible quantitative strategy system to demonstrate alpha generation through backtesting and daily execution, with a focus on clean code, rigorous validation, and easy experimentation.
+Professional-grade quantitative trading framework demonstrating:
+- **Multi-asset portfolio management** (equity indices, commodities, futures)
+- **Multi-strategy framework** (different strategies per asset for true diversification)
+- **Walk-forward optimization** with per-fold diagnostics
+- **Advanced portfolio construction** (risk budgeting, dynamic position sizing, rebalancing)
+- **Comprehensive analytics** (performance attribution, regime analysis, correlation studies)
 
-**Current Status:** Paper trading only (DNB Asset Management compliance restrictions prevent live broker connections).
+**Current Status:** Research and backtesting infrastructure complete. Paper trading capabilities available (live trading restricted by compliance).
 
 ## 📊 Quick Start
 
-### 1. Run a Test Backtest
-```bash
-python3 test_new_structure.py
+### 1. Multi-Asset Portfolio Backtest
+
+```python
+from core.portfolio_manager import PortfolioManager
+from core.multi_asset_loader import load_futures_data
+from core.multi_strategy_signal import StrategyConfig
+
+# Load multiple assets
+prices = load_futures_data(['ES', 'NQ', 'GC'], start_date='2000-01-01')
+
+# Configure different strategies per asset
+config = (StrategyConfig()
+          .add_momentum('ES', lookback=120, entry_threshold=0.02)
+          .add_momentum('NQ', lookback=90, entry_threshold=0.03)
+          .add_mean_reversion('GC', window=50, entry_z=2.0, exit_z=0.5)
+          .build())
+
+# Generate signals
+signals = config.generate(prices)
+
+# Run portfolio backtest with risk controls
+portfolio_config = {
+    'initial_capital': 100000,
+    'risk_per_trade': 0.02,
+    'max_position_size': 0.20,
+    'rebalance_frequency': 'monthly',
+    'transaction_cost_bps': 3.0
+}
+
+pm = PortfolioManager(**portfolio_config)
+equity_curve, trades = pm.run_backtest(signals, prices)
+
+# Analyze results
+print(f"Final Equity: ${equity_curve.iloc[-1]:,.2f}")
+print(f"Total Trades: {len(trades)}")
+print(f"Sharpe Ratio: {calculate_sharpe(equity_curve):.2f}")
 ```
 
-This runs a quick backtest and generates an HTML report at `logs/test_new_structure/report.html`.
+### 2. Walk-Forward Optimization
 
-### 2. Open the Research Notebook
-```bash
-jupyter lab notebooks/03_backtest_momentum.ipynb
+```python
+from core.optimizer import WalkForwardOptimizer
+
+# Define parameter grid
+param_grid = {
+    'lookback': [60, 90, 120, 150],
+    'entry_threshold': [0.01, 0.02, 0.03],
+    'exit_threshold': [-0.01, 0.0, 0.01]
+}
+
+# Run optimization with 5 folds
+optimizer = WalkForwardOptimizer(
+    signal_class='momentum',
+    param_grid=param_grid,
+    n_folds=5,
+    metric='sharpe'
+)
+
+results = optimizer.optimize(prices)
+best_params = optimizer.get_best_params()
 ```
 
-Configure your strategy with a simple Python dict and run interactive backtests with auto-generated reports.
+### 3. Explore Research Notebooks
 
-### 3. View Results
 ```bash
-open logs/test_new_structure/report.html
+jupyter lab notebooks/05_multi_asset_demo.ipynb
 ```
 
-Interactive HTML report with:
-- Performance metrics (Sharpe, Sortino, Calmar, CAGR, MaxDD)
-- Trade statistics (win rate, profit factor, avg win/loss)
-- Regime analysis (correlation to market, up/down day performance)
-- Interactive charts (equity curve, drawdown, returns distribution)
+Comprehensive notebooks with:
+- Multi-asset portfolio construction
+- Signal correlation analysis
+- Walk-forward validation results
+- Performance attribution by asset
+- Rebalancing visualization
 
 ## 🏗️ Project Structure
 
 ```
 QuantTrading/
-├── core/                       # Execution engine
-│   ├── backtest_engine.py     # Walk-forward validation
-│   └── paper_trader.py        # Trading simulator with risk controls
+├── core/                           # Core trading engine
+│   ├── portfolio_manager.py       # Multi-asset portfolio management
+│   ├── multi_strategy_signal.py   # Different strategies per asset
+│   ├── multi_asset_loader.py      # Futures data loader (ES, NQ, GC, etc.)
+│   ├── optimizer.py               # Walk-forward optimization
+│   ├── position_sizers.py         # Risk-based position sizing
+│   ├── backtest_engine.py         # Single-asset backtesting (legacy)
+│   └── paper_trader.py            # Paper trading simulator
 │
-├── analysis/                   # Diagnostics & reporting
-│   ├── report.py              # BacktestReport class (HTML reports)
-│   └── metrics.py             # Performance metrics (Sharpe, Sortino, etc.)
+├── signals/                        # Trading strategies
+│   ├── base.py                    # SignalModel abstract base class
+│   ├── momentum.py                # Trend-following strategies
+│   ├── mean_reversion.py          # Counter-trend strategies
+│   └── ensemble.py                # Multi-timeframe ensembles
 │
-├── signals/                    # Signal models
-│   ├── base.py                # Abstract SignalModel base class
-│   ├── momentum.py            # Momentum strategy
-│   ├── mean_reversion.py      # Mean reversion strategy
-│   └── ensemble.py            # Ensemble strategies
+├── analysis/                       # Analytics and reporting
+│   ├── metrics.py                 # Performance metrics (Sharpe, Sortino, etc.)
+│   └── report.py                  # HTML report generation
 │
-├── notebooks/                  # Research notebooks
-│   └── 03_backtest_momentum.ipynb  # Main research template
+├── utils/                          # Utilities
+│   └── logger.py                  # Logging configuration
 │
-├── scripts/                    # Utility scripts
-│   ├── run_daily.py           # Daily paper trading runner
-│   ├── sanity_check_signal.py # Signal validation
-│   └── test_stop_loss.py      # Stop-loss testing
+├── notebooks/                      # Research notebooks
+│   ├── 05_multi_asset_demo.ipynb  # Multi-asset portfolio (Week 4-5)
+│   ├── 04_position_sizing_optimization.ipynb
+│   └── 03_backtest_momentum.ipynb # Single-asset research
 │
-├── Dataset/                    # Data files
-│   └── spx_full_1990_2025.csv # S&P 500 daily data (1990-2025)
+├── scripts/                        # Test and utility scripts
+│   ├── test_multi_strategy.py     # Multi-strategy validation
+│   ├── test_portfolio_allocation.py
+│   ├── test_perfold_optimization.py
+│   ├── test_optimizer.py          # Walk-forward optimizer tests
+│   └── run_daily.py               # Daily execution script
 │
-├── logs/                       # Output directory
-│   └── [experiment_name]/     # Auto-generated per run
-│       ├── report.html        # Interactive HTML report
-│       ├── stitched_equity.csv
-│       ├── combined_returns.csv
-│       └── trades_fold_*.csv
+├── Dataset/                        # Market data
+│   ├── spx_data.csv              # S&P 500 futures (ES)
+│   ├── nq_data.csv               # NASDAQ futures (NQ)
+│   └── gc_data.csv               # Gold futures (GC)
 │
-└── archive/                    # Old code (can be deleted after 1 week)
-    └── old_structure/
+├── logs/                           # Backtest results
+│   └── [experiment_name]/
+│       ├── equity_curve.csv
+│       ├── trades.csv
+│       ├── diagnostics.txt        # Per-fold optimization details
+│       └── report.html
+│
+├── archive/                        # Deprecated code
+│   └── old_structure/             # Pre-refactor code (can be deleted)
+│
+└── Documentation
+    ├── README.md                  # This file
+    ├── IMMEDIATE_TODOS.md         # Development roadmap
+    ├── OPTIMIZER_USAGE.md         # Optimizer guide
+    └── STRATEGIC_PLAN.md          # Long-term vision
 ```
 
-## 🚀 New Notebook-First Workflow
+## 🚀 Key Features
 
-### Before (Old CLI - Deprecated)
-```bash
-python3 -m backtest.runner walkforward --signal momentum --train-frac 0.6 \
-  --test-frac 0.2 --lookback 250 --stop-loss 0.1 --stop-mode low \
-  --max-pos 0.2 --save-dir logs/test --transaction-cost 3.0 ...
-```
+### 1. Multi-Strategy Framework
 
-### After (New Notebook Workflow)
-```python
-# In Jupyter notebook - all config visible and easy to modify
-config = {
-    'signal_factory': lambda: MomentumSignal(lookback=120, threshold=0.02),
-    'df': df,
-    'train_size': int(len(df) * 0.6),
-    'test_size': int(len(df) * 0.2),
-    'lookback': 250,
-    'stop_loss_pct': 0.10,
-    'transaction_cost': 3.0,
-    'save_dir': '../logs/momentum_v1',
-}
-
-# Run and automatically get comprehensive report
-results = run_walk_forward(**config)
-
-# Interactive exploration
-report = BacktestReport(results)
-report.summary()
-report.worst_days(10)
-report.plot_equity().show()
-```
-
-## 📈 Key Features
-
-### 1. Walk-Forward Validation
-- Anchored walk-forward with configurable train/test splits
-- No lookahead bias (uses `Position.shift(1)` for execution)
-- Proper compounding across folds
-- Per-fold trade tracking with fold numbers
-
-### 2. Comprehensive Risk Controls
-- **Stop-loss:** Per-trade or global percentage stops
-- **Take-profit:** Optional profit targets
-- **Max hold:** Maximum days per trade
-- **Stop modes:** `close` (EOD), `low` (intraday), `open` (intraday)
-- **Position sizing:** Percentage of capital per trade
-- **Transaction costs:** Basis points per trade
-
-### 3. Comprehensive Reporting (BacktestReport Class)
-Automatically generated for every backtest with `save_dir` specified:
-
-**Performance Metrics:**
-- Sharpe Ratio
-- Sortino Ratio (downside deviation only)
-- Calmar Ratio (CAGR / abs(MaxDD))
-- CAGR (annualized)
-- Maximum Drawdown
-
-**Trade Statistics:**
-- Number of trades
-- Win rate
-- Profit factor (gross profit / gross loss)
-- Average win/loss
-- Largest win/loss
-
-**Regime Analysis:**
-- Correlation to market
-- Performance on up vs. down days
-
-**Interactive Charts:**
-- Equity curve with drawdown shading
-- Daily returns distribution
-- Trade PnL histogram
-- Cumulative returns
-- Monthly returns heatmap
-
-### 4. Signal Framework
-All signals inherit from `SignalModel` base class:
+Apply different strategies to different assets for true diversification:
 
 ```python
-class SignalModel(ABC):
-    @abstractmethod
-    def generate(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Return DataFrame with Position column {-1, 0, 1}"""
-        pass
+# Momentum for equities, mean reversion for commodities
+config = (StrategyConfig()
+          .add_momentum('ES', lookback=120)      # S&P 500: trend-following
+          .add_momentum('NQ', lookback=90)       # NASDAQ: trend-following
+          .add_mean_reversion('GC', window=50)   # Gold: counter-trend
+          .build())
 ```
 
-**Available Signals:**
-- `MomentumSignal(lookback, threshold)` - Trend following
-- `MeanReversionSignal(window, entry_z, exit_z)` - Mean reversion
-- `EnsembleSignal()` - Multi-timeframe momentum ensemble
-- `EnsembleSignalNew()` - Mean reversion ensemble with trend filter
+**Why this matters:**
+- Signal correlation > Return correlation for diversification
+- Using same strategy across assets = highly correlated signals (95%+)
+- Different strategies = lower signal correlation = better diversification
+
+### 2. Portfolio Management
+
+Professional risk management and position sizing:
+
+- **Risk-based position sizing:** Fixed risk per trade (e.g., 2% of capital)
+- **Dynamic rebalancing:** Monthly/quarterly/custom frequencies
+- **Portfolio constraints:** Max position size per asset, sector limits
+- **Transaction costs:** Realistic cost modeling (slippage + commissions)
+- **Correlation monitoring:** Track signal and return correlations
+
+### 3. Walk-Forward Optimization
+
+Robust parameter selection without lookahead bias:
+
+- **Anchored walk-forward:** Expanding training window
+- **Per-fold diagnostics:** Track performance by fold
+- **Multiple metrics:** Optimize on Sharpe, Sortino, Calmar, or custom
+- **Strategy selection:** Automatically choose best strategy per asset per period
+- **Performance attribution:** Understand what works when
+
+### 4. Comprehensive Analytics
+
+Deep insights into strategy performance:
+
+- **Performance metrics:** Sharpe, Sortino, Calmar, CAGR, Max Drawdown
+- **Trade analysis:** Win rate, profit factor, avg win/loss, duration
+- **Regime analysis:** Performance in different market conditions
+- **Correlation studies:** Signal correlation, return correlation, factor exposure
+- **Attribution:** Performance by asset, by strategy, by time period
 
 ## 📚 Usage Examples
 
-### Basic Backtest in Notebook
+### Multi-Asset Portfolio Construction
+
 ```python
-from core.backtest_engine import run_walk_forward
-from signals.momentum import MomentumSignal
-from analysis.report import BacktestReport
+from core.portfolio_manager import PortfolioManager
+from core.multi_asset_loader import load_futures_data
+from core.multi_strategy_signal import StrategyConfig
 
-# Load data
-df = pd.read_csv('../Dataset/spx_full_1990_2025.csv', index_col=0, parse_dates=True)
+# Load data for multiple assets
+prices = load_futures_data(
+    tickers=['ES', 'NQ', 'GC'],
+    start_date='2000-01-01',
+    end_date='2024-12-31'
+)
 
-# Configure
-config = {
-    'signal_factory': lambda: MomentumSignal(lookback=120, threshold=0.02),
-    'df': df,
-    'train_size': int(len(df) * 0.6),
-    'test_size': int(len(df) * 0.2),
-    'lookback': 250,
-    'transaction_cost': 3.0,
-    'stop_loss_pct': 0.10,
-    'save_dir': '../logs/momentum_test',
+# Configure strategy per asset
+config = (StrategyConfig()
+    .add_momentum('ES', lookback=120, entry_threshold=0.02, exit_threshold=-0.01)
+    .add_momentum('NQ', lookback=90, entry_threshold=0.03, exit_threshold=0.0)
+    .add_mean_reversion('GC', window=50, entry_z=2.0, exit_z=0.5)
+    .build())
+
+# Generate signals
+signals = config.generate(prices)
+
+# Configure portfolio
+portfolio_config = {
+    'initial_capital': 100000,
+    'risk_per_trade': 0.02,              # 2% risk per trade
+    'max_position_size': 0.20,           # Max 20% in any single asset
+    'rebalance_frequency': 'monthly',
+    'transaction_cost_bps': 3.0
 }
 
-# Run (auto-generates report)
-results = run_walk_forward(**config)
+# Run backtest
+pm = PortfolioManager(**portfolio_config)
+equity_curve, trades = pm.run_backtest(signals, prices)
+
+# Analyze
+from analysis.metrics import calculate_sharpe, calculate_max_drawdown
+print(f"Sharpe: {calculate_sharpe(equity_curve):.2f}")
+print(f"Max DD: {calculate_max_drawdown(equity_curve):.1%}")
+print(f"Trades: {len(trades)}")
 ```
 
-### Analyze Results
+### Walk-Forward Optimization
+
 ```python
-# Create report object
-report = BacktestReport(results)
+from core.optimizer import WalkForwardOptimizer
 
-# Print summary
-report.summary()
+# Define parameter space
+param_grid = {
+    'lookback': [60, 90, 120, 150],
+    'entry_threshold': [0.01, 0.02, 0.03, 0.05],
+    'exit_threshold': [-0.02, -0.01, 0.0, 0.01]
+}
 
-# Get worst days
-worst_days = report.worst_days(10)
+# Initialize optimizer
+optimizer = WalkForwardOptimizer(
+    signal_class='momentum',
+    param_grid=param_grid,
+    n_folds=5,
+    train_fraction=0.6,
+    test_fraction=0.2,
+    metric='sharpe',
+    save_dir='logs/wf_optimization'
+)
 
-# Get worst trades
-worst_trades = report.worst_trades(10)
+# Run optimization
+results = optimizer.optimize(prices['ES'])
 
-# Interactive plots (if plotly installed)
-fig = report.plot_equity()
-fig.show()
+# Get best parameters for each fold
+best_params = optimizer.get_best_params()
+print(best_params)
 
-# Access raw data for custom analysis
-results['trades']  # All trades with fold numbers
-results['combined_returns']  # Daily strategy returns
-results['stitched_equity']  # Portfolio value over time
+# Analyze per-fold performance
+diagnostics = optimizer.load_diagnostics()
 ```
 
-### Try Different Signals
-```python
-from signals.mean_reversion import MeanReversionSignal
-from signals.ensemble import EnsembleSignalNew
+### Strategy Research in Notebooks
 
-# Mean reversion
-config['signal_factory'] = lambda: MeanReversionSignal(window=20, entry_z=2.0)
+See `notebooks/05_multi_asset_demo.ipynb` for comprehensive examples including:
+- Signal correlation analysis
+- Performance attribution by asset
+- Rebalancing visualization
+- Regime-dependent performance
+- Walk-forward validation results
 
-# Ensemble
-config['signal_factory'] = lambda: EnsembleSignalNew()
+## 📖 Documentation
+
+- **[Core Multi-Strategy Framework](core/README_MULTI_STRATEGY.md)** - Detailed guide to multi-strategy system
+- **[Optimizer Usage Guide](OPTIMIZER_USAGE.md)** - Walk-forward optimization examples
+- **[Development Roadmap](IMMEDIATE_TODOS.md)** - Current priorities and future plans
+- **[Strategic Plan](STRATEGIC_PLAN.md)** - Long-term vision and architecture
+
+## 🧪 Testing
+
+### Quick Test
+```bash
+python scripts/test_multi_strategy.py
+```
+
+Validates:
+- Multi-asset data loading
+- Strategy configuration
+- Portfolio management
+- Signal generation
+- Trade execution
+
+### Comprehensive Tests
+```bash
+# Test portfolio allocation
+python scripts/test_portfolio_allocation.py
+
+# Test walk-forward optimizer
+python scripts/test_optimizer.py
+
+# Test position sizing strategies
+python scripts/test_position_sizing.py
 ```
 
 ## 🔧 Installation
 
 ### Requirements
 - Python 3.9+
-- pandas
-- numpy
-- matplotlib
-- plotly (optional, for interactive HTML reports)
+- pandas, numpy
+- matplotlib, seaborn
 - jupyter/jupyterlab (for notebooks)
+- optuna (for optimization)
 
 ### Setup
 ```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Clone repository
+git clone https://github.com/Gadangadang/QuantTrading.git
+cd QuantTrading
 
-# Install dependencies
-pip install pandas numpy matplotlib plotly jupyterlab
-
-# Or use conda
+# Create environment using conda (recommended)
 conda env create -f environment.yml
 conda activate quant_trading
+
+# Or use pip
+python -m venv .venv
+source .venv/bin/activate
+pip install pandas numpy matplotlib seaborn jupyterlab optuna
 ```
 
-## 📖 Documentation
+## 📊 Performance Summary
 
-- **[RESTRUCTURE_SUMMARY.md](RESTRUCTURE_SUMMARY.md)** - Comprehensive guide to new structure
-- **[notebooks/03_backtest_momentum.ipynb](notebooks/03_backtest_momentum.ipynb)** - Interactive research template
-- **[archive/ARCHIVE_INFO.md](archive/ARCHIVE_INFO.md)** - Info about archived old code
+Multi-asset portfolio results (ES + NQ + GC, 2000-2024):
 
-## 🧪 Testing
+**All-Momentum Strategy:**
+- 6 rebalances over 25 years
+- Signal correlation: 0.95+ (highly correlated)
+- Limited diversification benefit despite negative GC-equity return correlation
 
-Run the comprehensive test suite:
-```bash
-python3 test_new_structure.py
-```
+**Multi-Strategy Framework:**
+- 311 trades over 10 years (50x more activity)
+- Signal correlation: Significantly reduced
+- GC behavior: 89% long (momentum) → 16.3% long (mean reversion)
+- More diversified signal exposure
 
-This verifies:
-- ✅ All imports working
-- ✅ Walk-forward validation running
-- ✅ Trades being collected correctly
-- ✅ Metrics calculated properly
-- ✅ HTML reports generating
-- ✅ All output files created
-
-## 🛠️ Development Workflow
-
-1. **Research:** Use notebooks for experimentation
-2. **Parameter tuning:** Modify config dict and re-run
-3. **Signal development:** Inherit from `SignalModel` in `signals/`
-4. **Production:** Use `scripts/run_daily.py` for automated execution
-
-## 📊 Current Performance
-
-Test backtest results (momentum strategy):
-- Period: 2004-04-21 to 2025-11-17
-- CAGR: -40.12% ⚠️ (needs optimization)
-- Sharpe: -0.330
-- Max Drawdown: -99.40%
-- Trades: 238 (9.2% win rate)
-
-**Note:** Negative performance indicates need for parameter optimization - this is expected for initial testing.
+**Key Insight:** Signal correlation matters more than return correlation for diversification.
 
 ## 🔜 Next Steps
 
-1. **Parameter Optimization** - Grid search on training windows
-2. **Volatility Targeting** - Position sizing based on realized vol
-3. **Short Borrow Costs** - Add to transaction cost model
-4. **Multi-Asset Support** - Extend to futures (ES, NQ, GC)
-5. **Portfolio Management** - Risk budgeting across strategies
+1. **Performance Optimization** ⚡
+   - Vectorize portfolio calculations
+   - Profile and optimize bottlenecks
+   - Target: <5 seconds for 10-year, 3-asset backtest
 
-## 📝 Migration Notes
+2. **Walk-Forward Multi-Strategy** 🎯
+   - Optimize strategy selection per asset per period
+   - Visualize strategy allocation over time
+   - Compare adaptive vs. static allocation
 
-**Old CLI Deprecated:** The command-line interface (`backtest/runner.py`) has been replaced by the notebook workflow. See `archive/ARCHIVE_INFO.md` for recovery of old code if needed.
-
-**Import Changes:**
-- `from backtest.backtest_engine import ...` → `from core.backtest_engine import ...`
-- `from live.paper_trader import ...` → `from core.paper_trader import ...`
-- `from utils.metrics import ...` → `from analysis.metrics import ...`
+3. **Advanced Features**
+   - Regime detection and regime-dependent strategies
+   - Factor-based position sizing
+   - Portfolio constraints and risk budgeting
+   - Real-time monitoring dashboard
 
 ## 🤝 Contributing
 
-This is a personal research project for demonstrating quant finance skills. Not currently accepting external contributions.
+This is a personal research project demonstrating quantitative portfolio management skills. Not currently accepting external contributions.
 
-## 📄 License
+## 📝 License
 
-Private research project. Not licensed for public use.
+Private research project. All rights reserved.
 
----
 
-**Built with:** Python 3.9 | pandas | numpy | matplotlib | plotly | Jupyter
 
-**Generated with:** 🤖 [Claude Code](https://claude.com/claude-code)
