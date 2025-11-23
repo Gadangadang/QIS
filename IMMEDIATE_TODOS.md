@@ -199,22 +199,50 @@
 
 ## 🎯 THIS WEEK'S FOCUS
 
-### Day 1-2: Documentation Sprint
-1. Add docstrings to all functions/classes ✓ (IN PROGRESS)
-2. Update README.md with quick start
-3. Create DEMO.md with screenshots
+### Day 1: Documentation Sprint ✅ COMPLETE
+1. ✅ Add docstrings to all signal functions/classes
+2. ✅ Create IMMEDIATE_TODOS.md with roadmap
+3. ✅ Organize repo structure (test scripts to scripts/)
 
-### Day 3-4: Performance Optimization
-1. Profile current code (identify bottlenecks)
-2. Vectorize portfolio manager calculations
-3. Add progress bars and timing
+### Day 2: Performance Optimization ⚡ **PRIORITY**
+**Goal: 10-year, 3-asset backtest in <5 seconds**
 
-### Day 5-7: One Advanced Feature
-Pick: Regime Detection (most impressive for interviews)
-1. Build simple regime classifier
-2. Implement regime-aware strategy selection
-3. Add to demo notebook
-4. Document results
+1. Profile current code to identify bottlenecks
+   - Time each component: data loading, signal generation, portfolio calculations
+   - Identify bar-by-bar loops that can be vectorized
+   
+2. Vectorize portfolio_manager.py
+   - Replace position calculation loops with pandas operations
+   - Vectorize rebalancing logic where possible
+   - Optimize equity curve generation
+   
+3. Add timing and progress indicators
+   - Add @timing decorator to key functions
+   - Progress bars for walk-forward folds
+   - Memory profiling for large datasets
+
+### Day 3-4: Walk-Forward for Multi-Strategy **PRIORITY**
+**Goal: Optimize strategy selection and parameters per asset per period**
+
+1. Extend walk-forward optimizer to handle MultiStrategySignal
+   - Test different strategy combinations
+   - Optimize each asset's strategy independently
+   - Example: Try momentum vs mean reversion for each asset in each fold
+   
+2. Implement strategy selection optimization
+   - Which strategy (momentum/mean_reversion) works best for each asset?
+   - Different parameters per asset per period
+   - Track strategy allocation over time
+   
+3. Visualization and analysis
+   - Plot which strategy was selected when for each asset
+   - Compare walk-forward multi-strategy vs static allocation
+   - Analyze regime changes and strategy effectiveness
+
+### Day 5-7: Polish and Additional Features
+1. Update README.md with quick start
+2. Create DEMO.md with screenshots
+3. Clean up code and add remaining docstrings
 
 ---
 
