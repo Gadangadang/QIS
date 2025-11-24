@@ -238,25 +238,45 @@ class RiskManager:
     
     def _calculate_portfolio_volatility(self, weights: Dict[str, float]) -> float:
         """Calculate portfolio volatility using correlation matrix."""
-        if self.correlation_matrix is None:
-            return 0.0
-        
         tickers = list(weights.keys())
-        if len(tickers) < 2:
-            if tickers and tickers[0] in self.volatility_cache:
-                return self.volatility_cache[tickers[0]]
-            return 0.0
         
+        # Get individual volatilities
         vol_dict = {t: self.calculate_volatility(t) for t in tickers}
         
+        # Single position case - just use that asset's volatility weighted
+        if len(tickers) == 1:
+            ticker = tickers[0]
+            return abs(weights[ticker]) * vol_dict[ticker]
+        
+        # Multiple positions - try correlation-based calculation
+        if self.correlation_matrix is not None:
+            portfolio_var = 0.0
+            pairs_calculated = 0
+            
+            for t1 in tickers:
+                for t2 in tickers:
+                    if t1 in self.correlation_matrix.index and t2 in self.correlation_matrix.columns:
+                        corr = self.correlation_matrix.loc[t1, t2]
+                        if not pd.isna(corr):
+                            cov = corr * vol_dict[t1] * vol_dict[t2]
+                            portfolio_var += weights[t1] * weights[t2] * cov
+                            pairs_calculated += 1
+            
+            # If we got correlation data, use it
+            if pairs_calculated >= len(tickers):  # At least got diagonal elements
+                return np.sqrt(max(0, portfolio_var))
+        
+        # Fallback: assume 0.5 correlation for uncorrelated assets
+        # This is more realistic than 0 or assuming perfect correlation
         portfolio_var = 0.0
         for t1 in tickers:
             for t2 in tickers:
-                if t1 in self.correlation_matrix.index and t2 in self.correlation_matrix.columns:
-                    corr = self.correlation_matrix.loc[t1, t2]
-                    if not pd.isna(corr):
-                        cov = corr * vol_dict[t1] * vol_dict[t2]
-                        portfolio_var += weights[t1] * weights[t2] * cov
+                if t1 == t2:
+                    corr = 1.0  # Perfect correlation with itself
+                else:
+                    corr = 0.5  # Moderate correlation assumption
+                cov = corr * vol_dict[t1] * vol_dict[t2]
+                portfolio_var += weights[t1] * weights[t2] * cov
         
         return np.sqrt(max(0, portfolio_var))
     

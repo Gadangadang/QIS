@@ -9,8 +9,11 @@ Architecture:
 """
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from core.risk_manager import RiskManager
 
 
 @dataclass
@@ -21,6 +24,8 @@ class PortfolioConfig:
     rebalance_threshold: float = 0.05  # Rebalance when drift > 5%
     rebalance_frequency: str = 'daily'  # 'daily', 'weekly', 'monthly', or 'never'
     transaction_cost_bps: float = 3.0  # Transaction costs in basis points
+    risk_manager: Optional['RiskManager'] = None  # Optional risk management
+    rejection_policy: str = 'skip'  # 'skip' or 'scale_down' for rejected trades
     
 
 class PortfolioManager:
@@ -222,12 +227,11 @@ class PortfolioManager:
         """
         Calculate target weights based on active signals.
         
-        If 2 signals active: 50% each
-        If 1 signal active: 100% to that signal
-        If 0 signals active: 0% each
+        If risk_manager is configured, uses risk-adjusted position sizing.
+        Otherwise, uses equal weight allocation.
         
         Returns:
-            {ticker: target_weight} where weights sum to 1.0 for active signals
+            {ticker: target_weight} where weights sum to <= 1.0
         """
         active_signals = self.get_active_signals(signals)
         n_active = len(active_signals)
@@ -235,17 +239,73 @@ class PortfolioManager:
         if n_active == 0:
             return {ticker: 0.0 for ticker in signals}
         
-        # Equal weight among active signals
-        equal_weight = 1.0 / n_active
-        
-        target_weights = {}
-        for ticker in signals:
-            if ticker in active_signals:
-                target_weights[ticker] = equal_weight
-            else:
-                target_weights[ticker] = 0.0
-        
-        return target_weights
+        # If risk manager is configured, use risk-adjusted sizing
+        if self.config.risk_manager:
+            target_weights = {}
+            total_weight = 0.0
+            
+            for ticker in signals:
+                signal = signals[ticker]
+                
+                if ticker in active_signals and signal != 0:
+                    # Calculate volatility if we have returns
+                    vol = None
+                    if ticker in self.config.risk_manager.returns_history:
+                        returns = pd.Series(list(self.config.risk_manager.returns_history[ticker]))
+                        if len(returns) >= 20:
+                            vol = self.config.risk_manager.calculate_volatility(ticker, returns)
+                    
+                    # Get current positions for validation
+                    current_positions = {t: pos['shares'] for t, pos in self.positions.items() 
+                                       if pos['shares'] != 0}
+                    
+                    # Calculate risk-adjusted position size
+                    position_size = self.config.risk_manager.calculate_position_size(
+                        ticker=ticker,
+                        signal=float(signal),
+                        capital=self.portfolio_value,
+                        positions=current_positions,
+                        volatility=vol
+                    )
+                    
+                    # Validate the position size
+                    is_valid, reason = self.config.risk_manager.validate_trade(
+                        ticker=ticker,
+                        size=position_size,
+                        positions=current_positions,
+                        portfolio_value=self.portfolio_value
+                    )
+                    
+                    if is_valid:
+                        target_weights[ticker] = position_size
+                        total_weight += position_size
+                    else:
+                        # Handle rejection based on policy
+                        if self.config.rejection_policy == 'scale_down':
+                            # Scale down to max allowed
+                            scaled_size = min(position_size, self.config.risk_manager.config.max_position_size)
+                            target_weights[ticker] = scaled_size
+                            total_weight += scaled_size
+                        else:  # 'skip'
+                            target_weights[ticker] = 0.0
+                            # Log the rejection
+                            self.config.risk_manager._log_violation(ticker, 'REJECTED', reason)
+                else:
+                    target_weights[ticker] = 0.0
+            
+            return target_weights
+        else:
+            # Default: Equal weight among active signals
+            equal_weight = 1.0 / n_active
+            
+            target_weights = {}
+            for ticker in signals:
+                if ticker in active_signals:
+                    target_weights[ticker] = equal_weight
+                else:
+                    target_weights[ticker] = 0.0
+            
+            return target_weights
     
     def update_signals(self, signals: Dict[str, int], prices: Dict[str, float], date: pd.Timestamp):
         """
@@ -461,7 +521,8 @@ class BacktestResult:
     - Generating reports without full portfolio state
     """
     
-    def __init__(self, equity_curve: pd.DataFrame, trades: pd.DataFrame, config: PortfolioConfig):
+    def __init__(self, equity_curve: pd.DataFrame, trades: pd.DataFrame, config: PortfolioConfig,
+                 risk_metrics: Optional[pd.DataFrame] = None, violations: Optional[pd.DataFrame] = None):
         """
         Initialize backtest result.
         
@@ -469,10 +530,14 @@ class BacktestResult:
             equity_curve: DataFrame with Date and TotalValue columns
             trades: DataFrame with trade details
             config: PortfolioConfig used for the backtest
+            risk_metrics: Optional DataFrame with risk metrics history
+            violations: Optional DataFrame with trade rejections/violations
         """
         self.config = config
         self._equity_curve = equity_curve
         self._trades = trades
+        self.risk_metrics = risk_metrics
+        self.violations = violations
     
     def get_equity_curve(self) -> pd.DataFrame:
         """Return equity curve as DataFrame."""
@@ -558,11 +623,18 @@ def run_multi_asset_backtest(
     equity_curve = pm.get_equity_curve()
     trades = pm.get_trades_df()
     
+    # Extract risk metrics if risk manager was used
+    risk_metrics = None
+    violations = None
+    if config.risk_manager:
+        risk_metrics = config.risk_manager.get_metrics_dataframe()
+        violations = config.risk_manager.get_violations_dataframe()
+    
     if return_pm:
         return pm, equity_curve, trades
     else:
-        # Return lightweight BacktestResult for walk-forward optimization
-        result = BacktestResult(equity_curve, trades, config)
+        # Return lightweight BacktestResult with risk data
+        result = BacktestResult(equity_curve, trades, config, risk_metrics, violations)
         return result, equity_curve, trades
 
 
@@ -579,6 +651,7 @@ def _run_backtest(
     - Position value updates
     - Drift-based rebalancing
     - Transaction cost tracking
+    - Risk management (if configured)
     """
     # Initialize portfolio manager
     pm = PortfolioManager(config)
@@ -594,6 +667,9 @@ def _run_backtest(
     
     all_dates = sorted(all_dates)
     
+    # Track previous prices for returns calculation (if using risk manager)
+    prev_prices = {}
+    
     # Initialize on first date
     first_date = all_dates[0]
     init_prices = {ticker: df.loc[first_date, 'Close'] 
@@ -604,16 +680,81 @@ def _run_backtest(
     pm.initialize_positions(init_prices, init_signals)
     pm.equity_curve.append(pm.get_portfolio_state(first_date))
     
+    # Initialize previous prices
+    prev_prices = init_prices.copy()
+    
+    # Initialize correlation matrix if risk manager exists
+    if config.risk_manager:
+        # Build initial returns dataframe for correlation (need at least 60 days)
+        returns_data = {}
+        for ticker, df in prices_dict.items():
+            # Get returns from start to first_date
+            mask = df.index <= first_date
+            if mask.sum() >= 60:
+                returns_data[ticker] = df.loc[mask, 'Close'].pct_change()
+        
+        if returns_data:
+            returns_df = pd.DataFrame(returns_data).dropna()
+            if len(returns_df) >= 60:
+                config.risk_manager.update_correlations(returns_df)
+    
+    # Track iteration for periodic correlation updates
+    iteration_count = 0
+    
     # Run through all dates
     for date in all_dates[1:]:
+        iteration_count += 1
+        
         # Get current prices and signals
         current_prices = {ticker: df.loc[date, 'Close'] 
                          for ticker, df in prices_dict.items()}
         current_signals = {ticker: df.loc[date, 'Signal'] 
                           for ticker, df in signals_dict.items()}
         
+        # Update risk manager with daily returns
+        if config.risk_manager:
+            for ticker in current_prices:
+                if ticker in prev_prices and prev_prices[ticker] > 0:
+                    daily_return = (current_prices[ticker] / prev_prices[ticker]) - 1
+                    config.risk_manager.update_returns(ticker, pd.Timestamp(date), daily_return)
+            
+            # Update correlations periodically (every 20 days) for better heatmap
+            if iteration_count % 20 == 0 and len(config.risk_manager.returns_history) > 0:
+                # Build returns dataframe from returns_history buffers
+                returns_for_corr = {}
+                for ticker, returns_deque in config.risk_manager.returns_history.items():
+                    if len(returns_deque) >= 60:
+                        returns_for_corr[ticker] = list(returns_deque)
+                
+                if len(returns_for_corr) >= 2:  # Need at least 2 assets for correlation
+                    returns_df_update = pd.DataFrame(returns_for_corr)
+                    config.risk_manager.update_correlations(returns_df_update)
+        
         # Update position values with current prices
         pm.update_positions(current_prices)
+        
+        # Check for drawdown stop before trading
+        if config.risk_manager:
+            current_value = pm.portfolio_value
+            equity_series = pd.Series([state['TotalValue'] for state in pm.equity_curve])
+            peak = equity_series.max()
+            current_dd = (current_value - peak) / peak if peak > 0 else 0
+            
+            should_stop, reason = config.risk_manager.check_stop_conditions(
+                current_drawdown=current_dd,
+                equity_curve=equity_series
+            )
+            
+            if should_stop:
+                # Log violation and stop trading
+                config.risk_manager._log_violation('PORTFOLIO', 'STOP', reason)
+                # Update timestamp with actual date
+                if config.risk_manager.violations_history:
+                    config.risk_manager.violations_history[-1]['date'] = pd.Timestamp(date)
+                    config.risk_manager.violations_history[-1]['timestamp'] = pd.Timestamp(date)
+                # Record final state and exit
+                pm.equity_curve.append(pm.get_portfolio_state(date))
+                break
         
         # Check if signals changed (entries/exits)
         pm.update_signals(current_signals, current_prices, date)
@@ -626,8 +767,34 @@ def _run_backtest(
             pm.rebalance(current_prices, current_signals, date)
             pm.update_positions(current_prices)  # Update after rebalance
         
+        # Collect risk metrics if risk manager is configured
+        if config.risk_manager:
+            current_value = pm.portfolio_value
+            
+            # Get current positions as shares dict
+            current_positions = {ticker: pos['shares'] 
+                               for ticker, pos in pm.positions.items() 
+                               if pos['shares'] != 0}
+            
+            # Calculate drawdown
+            equity_series = pd.Series([state['TotalValue'] for state in pm.equity_curve])
+            peak = equity_series.max()
+            drawdown = (current_value - peak) / peak if peak > 0 else 0
+            
+            # Log metrics
+            config.risk_manager.log_metrics(
+                date=pd.Timestamp(date),
+                positions=current_positions,
+                prices=current_prices,
+                portfolio_value=current_value,
+                drawdown=drawdown
+            )
+        
         # Record portfolio state
         pm.equity_curve.append(pm.get_portfolio_state(date))
+        
+        # Update previous prices for next iteration
+        prev_prices = current_prices.copy()
     
     return pm
 
