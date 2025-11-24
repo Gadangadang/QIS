@@ -1,5 +1,5 @@
 """
-Test Parameter Optimization Framework
+"""<br/>Test Parameter Optimization Framework
 Demonstrates grid search and random search on MomentumSignalV2
 """
 import sys
@@ -8,7 +8,8 @@ import numpy as np
 from pathlib import Path
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 from core.optimizer import ParameterOptimizer, save_optimization_results
 from core.backtest_engine import run_walk_forward

@@ -1,0 +1,124 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Risk Management Dashboard - Test Run</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }
+                .container {
+                    max-width: 1400px;
+                    margin: 0 auto;
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                h1 {
+                    color: #2c3e50;
+                    margin-bottom: 10px;
+                    border-bottom: 3px solid #3498db;
+                    padding-bottom: 10px;
+                }
+                .timestamp {
+                    color: #7f8c8d;
+                    font-size: 14px;
+                    margin-bottom: 20px;
+                }
+                .summary {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 15px;
+                    margin: 20px 0;
+                }
+                .summary-card {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                }
+                .summary-card h3 {
+                    margin: 0 0 10px 0;
+                    font-size: 14px;
+                    opacity: 0.9;
+                }
+                .summary-card .value {
+                    font-size: 28px;
+                    font-weight: bold;
+                    margin: 0;
+                }
+                .violations {
+                    margin: 30px 0;
+                }
+                .violations h2 {
+                    color: #e74c3c;
+                    margin-bottom: 15px;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 10px 0;
+                }
+                th, td {
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 1px solid #ddd;
+                }
+                th {
+                    background-color: #34495e;
+                    color: white;
+                    font-weight: 600;
+                }
+                tr:hover {
+                    background-color: #f5f5f5;
+                }
+                .chart-container {
+                    margin: 30px 0;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Risk Management Dashboard - Test Run</h1>
+                <div class="timestamp">Generated: 2025-11-24 21:19:16</div>
+                
+                
+        <div class="summary">
+            <div class="summary-card">
+                <h3>Avg Leverage</h3>
+                <p class="value">0.75x</p>
+            </div>
+            <div class="summary-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <h3>Max Leverage</h3>
+                <p class="value">0.84x</p>
+            </div>
+            <div class="summary-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <h3>Avg Positions</h3>
+                <p class="value">2.0</p>
+            </div>
+            <div class="summary-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <h3>Avg Volatility</h3>
+                <p class="value">0.0%</p>
+            </div>
+            <div class="summary-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                <h3>Max Drawdown</h3>
+                <p class="value">-17.8%</p>
+            </div>
+        </div>
+        
+                
+                
+                <div class="chart-container">
+                    <div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>                <div id="32be0849-7fe8-4e4f-9a3b-e2efedf33f2f" class="plotly-graph-div" style="height:1200px; width:100%;"></div>            <script type="text/javascript">                                    window.PLOTLYENV=window.PLOTLYENV || {};                                    if (document.getElementById("32be0849-7fe8-4e4f-9a3b-e2efedf33f2f")) {                    Plotly.newPlot(                        "32be0849-7fe8-4e4f-9a3b-e2efedf33f2f",                        [{"hovertemplate":"%{x}<br>Leverage: %{y:.2f}x<extra></extra>","line":{"color":"blue","width":2},"mode":"lines","name":"Leverage","x":["1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00.000001"],"y":[0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7913599853515625,0.7915962415640568,0.79633968079065,0.7741497516748497,0.7684525067453509,0.7863486115550218,0.7664356566203004,0.7385105853313961,0.7241031344689498,0.7312930126764866,0.7257048261688076,0.7146941294411412,0.7451169818884391,0.7114525959049373,0.7138339366963037,0.694840638916665,0.7213956401100827,0.7211432856207696,0.6978729270215642,0.7008431737264388,0.7635613864539168,0.7873441895579397,0.7888681105115338,0.7405901303179516,0.7909746632596069,0.8353697069508306,0.8074204617529024,0.7685283320056214,0.7553825252086096,0.7323609740121052,0.7606148833791513,0.7086701694180557,0.706994868635101,0.7076170001861709,0.6970575995032074,0.6853659215436486,0.6932971257458638,0.7207294699953141,0.708042248898737,0.6791986970912566,0.6589954262634773],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"%{x}<br>Positions: %{y}<extra></extra>","line":{"color":"green","width":2},"marker":{"size":4},"mode":"lines+markers","name":"# Positions","x":["1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00.000001"],"y":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"fill":"tozeroy","fillcolor":"rgba(255, 165, 0, 0.2)","hovertemplate":"%{x}<br>Max Weight: %{y:.1f}%<extra></extra>","line":{"color":"orange","width":2},"mode":"lines","name":"Max Weight","x":["1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00.000001"],"y":[48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.199999999999996,48.21438984741839,48.50330232082354,47.15176243609406,46.804755750533836,47.894768219944865,46.68191383556861,44.981059027339676,44.10353281370201,44.54145251651504,44.201088340089726,43.5304509663315,45.38344014332195,43.33301627246633,43.47805851401064,42.32121842868351,43.938625274133386,43.92325491600302,42.50590844253505,42.68681965086631,46.506848347568045,47.95540669122077,48.04822537212819,45.10771954872988,48.176530877001554,50.88053555948036,49.17820837150451,46.80937410073183,46.00869185833304,44.60649969773428,46.327383311639295,43.16354478142536,43.0615058873277,43.099398554782006,42.456248632698525,41.74413418657779,42.227206428822825,43.89805031441061,43.125299520619414,41.368502079688746,40.13796519138961],"type":"scatter","xaxis":"x3","yaxis":"y3"},{"hovertemplate":"%{x}<br>Vol: %{y:.1f}%<extra></extra>","line":{"color":"purple","width":2},"mode":"lines","name":"Vol","x":["1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00.000001"],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"type":"scatter","xaxis":"x4","yaxis":"y4"},{"fill":"tozeroy","fillcolor":"rgba(255, 0, 0, 0.2)","hovertemplate":"%{x}<br>DD: %{y:.1f}%<extra></extra>","line":{"color":"red","width":2},"mode":"lines","name":"Drawdown","x":["1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00","1970-01-01T00:00:00.000001"],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.029845545000003765,-1.8562306641681963,-1.3750984042710401,-0.6439013353482472,-2.9050958349053806,-0.38244904214470854,-0.31874808939119925,-0.18196449923948158,-1.1764165514734188,-0.7460530099387752,-0.04147052888946338,-4.674818630242164,-0.16423884172222578,-3.154218156141559,-0.506962555015249,-4.169360248027578,-4.135825591826287,-0.9392641134842012,-1.973473141395245,-10.02527968049511,-12.743088595678383,-12.911649897451284,-7.234488578088927,-13.143586787158522,-17.75950022927001,-14.912706022070793,-10.606780086199818,-9.051083523554192,-6.19213116095262,-9.676731688777158,-3.056139290608951,-2.826420330890544,-2.9118546121848903,-1.441111549565095,-0.890690348468973,-2.024484423182912,-5.753620226854301,-4.064844366948128,-0.02372973368328618,-0.8322585400113216],"type":"scatter","xaxis":"x5","yaxis":"y5"},{"colorbar":{"title":{"text":"Correlation"}},"colorscale":[[0.0,"rgb(5,48,97)"],[0.1,"rgb(33,102,172)"],[0.2,"rgb(67,147,195)"],[0.3,"rgb(146,197,222)"],[0.4,"rgb(209,229,240)"],[0.5,"rgb(247,247,247)"],[0.6,"rgb(253,219,199)"],[0.7,"rgb(244,165,130)"],[0.8,"rgb(214,96,77)"],[0.9,"rgb(178,24,43)"],[1.0,"rgb(103,0,31)"]],"hovertemplate":"%{x} vs %{y}<br>Corr: %{z:.2f}<extra></extra>","showscale":true,"text":[[1.0,-0.11786282386138254],[-0.11786282386138254,1.0]],"textfont":{"size":10},"texttemplate":"%{text:.2f}","x":["ES","GC"],"y":["ES","GC"],"z":[[1.0,-0.11786282386138254],[-0.11786282386138254,1.0]],"zmax":1,"zmid":0,"zmin":-1,"type":"heatmap","xaxis":"x6","yaxis":"y6"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"#C8D4E3","linecolor":"#C8D4E3","minorgridcolor":"#C8D4E3","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"#C8D4E3","linecolor":"#C8D4E3","minorgridcolor":"#C8D4E3","startlinecolor":"#2a3f5f"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmapgl":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmapgl"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermapbox"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"geo":{"bgcolor":"white","lakecolor":"white","landcolor":"white","showlakes":true,"showland":true,"subunitcolor":"#C8D4E3"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"light"},"paper_bgcolor":"white","plot_bgcolor":"white","polar":{"angularaxis":{"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":""},"bgcolor":"white","radialaxis":{"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"},"yaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"},"zaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"ternary":{"aaxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""},"baxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""},"bgcolor":"white","caxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""}},"title":{"x":0.05},"xaxis":{"automargin":true,"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":"","title":{"standoff":15},"zerolinecolor":"#EBF0F8","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":"","title":{"standoff":15},"zerolinecolor":"#EBF0F8","zerolinewidth":2}}},"xaxis":{"anchor":"y","domain":[0.0,0.425]},"yaxis":{"anchor":"x","domain":[0.7466666666666667,1.0],"title":{"text":"Leverage"}},"xaxis2":{"anchor":"y2","domain":[0.575,1.0]},"yaxis2":{"anchor":"x2","domain":[0.7466666666666667,1.0],"title":{"text":"Count"}},"xaxis3":{"anchor":"y3","domain":[0.0,0.425]},"yaxis3":{"anchor":"x3","domain":[0.37333333333333335,0.6266666666666667],"title":{"text":"Weight (%)"}},"xaxis4":{"anchor":"y4","domain":[0.575,1.0]},"yaxis4":{"anchor":"x4","domain":[0.37333333333333335,0.6266666666666667],"title":{"text":"Volatility (%)"}},"xaxis5":{"anchor":"y5","domain":[0.0,0.425],"title":{"text":"Date"}},"yaxis5":{"anchor":"x5","domain":[0.0,0.25333333333333335],"title":{"text":"Drawdown (%)"}},"xaxis6":{"anchor":"y6","domain":[0.575,1.0]},"yaxis6":{"anchor":"x6","domain":[0.0,0.25333333333333335]},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Leverage Over Time","x":0.2125,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Number of Positions","x":0.7875,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Max Position Weight","x":0.2125,"xanchor":"center","xref":"paper","y":0.6266666666666667,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Portfolio Volatility","x":0.7875,"xanchor":"center","xref":"paper","y":0.6266666666666667,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Drawdown","x":0.2125,"xanchor":"center","xref":"paper","y":0.25333333333333335,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Correlation Heatmap","x":0.7875,"xanchor":"center","xref":"paper","y":0.25333333333333335,"yanchor":"bottom","yref":"paper"},{"showarrow":false,"text":"Max Leverage","x":1,"xanchor":"right","xref":"x domain","y":1.0,"yanchor":"bottom","yref":"y"}],"shapes":[{"line":{"color":"red","dash":"dash"},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":1.0,"y1":1.0,"yref":"y"}],"title":{"font":{"size":20},"text":"<b>Risk Management Dashboard - Test Run</b>","x":0.5,"xanchor":"center"},"height":1200,"showlegend":false,"hovermode":"x unified"},                        {"responsive": true}                    )                };                            </script>        </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        

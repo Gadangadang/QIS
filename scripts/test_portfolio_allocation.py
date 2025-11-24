@@ -1,7 +1,14 @@
 """
-Test PortfolioManager logic with simple scenarios.
+"""<br/>Test PortfolioManager logic with simple scenarios.
 Verifies that allocation works correctly with signal-driven entries/exits.
 """
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import pandas as pd
 import numpy as np
 from core.portfolio_manager import PortfolioManager, PortfolioConfig

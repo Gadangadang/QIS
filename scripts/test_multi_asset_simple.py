@@ -2,6 +2,13 @@
 Simple multi-asset backtest test.
 Tests ES + GC portfolio with momentum signals.
 """
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from core.multi_asset_loader import load_assets
 from core.multi_asset_signal import SingleAssetWrapper
 from signals.momentum import MomentumSignalV2

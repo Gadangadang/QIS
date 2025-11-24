@@ -1,12 +1,17 @@
 """
-Validate futures data quality for multi-asset framework.
+"""<br/>Validate futures data quality for multi-asset framework.
 Check columns, date ranges, gaps, and alignment across ES, NQ, GC.
 """
+import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+PROJECT_ROOT = project_root
 DATASET_DIR = PROJECT_ROOT / "Dataset"
 
 def validate_futures_data():

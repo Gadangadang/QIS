@@ -1,10 +1,13 @@
 """
-Test Multi-Strategy Signal Framework
+"""<br/>Test Multi-Strategy Signal Framework
 Demonstrates using different strategies for different assets.
 """
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 from core.multi_asset_loader import load_assets
 from core.multi_strategy_signal import MultiStrategySignal, StrategyConfig

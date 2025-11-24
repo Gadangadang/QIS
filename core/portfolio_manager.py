@@ -1,6 +1,11 @@
 """
 Multi-Asset Portfolio Manager
 Manages capital allocation across multiple assets with drift-based rebalancing.
+
+Architecture:
+- PortfolioManager: Top-level orchestrator for portfolio management
+- BacktestResult: Lightweight container for backtest results and metrics
+- Future modules: RiskManager, Reporter, StrategySelector (for walk-forward)
 """
 import pandas as pd
 import numpy as np
@@ -443,21 +448,137 @@ class PortfolioManager:
         }
 
 
+class BacktestResult:
+    """
+    Lightweight result container for backtest outputs.
+    
+    Provides a clean interface for accessing backtest results and metrics
+    without requiring the full PortfolioManager state machine.
+    
+    This is useful for:
+    - Walk-forward optimization (lightweight result objects)
+    - Comparing multiple backtest runs
+    - Generating reports without full portfolio state
+    """
+    
+    def __init__(self, equity_curve: pd.DataFrame, trades: pd.DataFrame, config: PortfolioConfig):
+        """
+        Initialize backtest result.
+        
+        Args:
+            equity_curve: DataFrame with Date and TotalValue columns
+            trades: DataFrame with trade details
+            config: PortfolioConfig used for the backtest
+        """
+        self.config = config
+        self._equity_curve = equity_curve
+        self._trades = trades
+    
+    def get_equity_curve(self) -> pd.DataFrame:
+        """Return equity curve as DataFrame."""
+        return self._equity_curve
+    
+    def get_trades_df(self) -> pd.DataFrame:
+        """Return trades as DataFrame."""
+        return self._trades
+    
+    def calculate_metrics(self) -> Dict:
+        """Calculate portfolio performance metrics."""
+        equity_df = self._equity_curve.copy()
+        if equity_df.empty or 'TotalValue' not in equity_df.columns:
+            return {}
+        
+        equity_df['Return'] = equity_df['TotalValue'].pct_change()
+        
+        total_return = (equity_df['TotalValue'].iloc[-1] / self.config.initial_capital) - 1
+        
+        # Annualized metrics
+        n_days = len(equity_df)
+        years = n_days / 252
+        cagr = ((equity_df['TotalValue'].iloc[-1] / self.config.initial_capital) ** (1/years)) - 1 if years > 0 else 0
+        
+        # Volatility
+        daily_vol = equity_df['Return'].std()
+        annual_vol = daily_vol * np.sqrt(252)
+        
+        # Sharpe (assuming 0% risk-free rate)
+        sharpe = (equity_df['Return'].mean() / daily_vol * np.sqrt(252)) if daily_vol > 0 else 0
+        
+        # Drawdown
+        running_max = equity_df['TotalValue'].expanding().max()
+        drawdown = (equity_df['TotalValue'] - running_max) / running_max
+        max_drawdown = drawdown.min()
+        
+        # Trade statistics
+        trades_df = self._trades
+        n_trades = len(trades_df)
+        n_rebalances = len(trades_df[trades_df['Type'] == 'Rebalance']) if not trades_df.empty and 'Type' in trades_df.columns else 0
+        total_tc = trades_df['TransactionCost'].sum() if not trades_df.empty and 'TransactionCost' in trades_df.columns else 0
+        
+        return {
+            'Total Return': total_return,
+            'CAGR': cagr,
+            'Annual Volatility': annual_vol,
+            'Sharpe Ratio': sharpe,
+            'Max Drawdown': max_drawdown,
+            'Total Trades': n_trades,
+            'Rebalances': n_rebalances,
+            'Transaction Costs': total_tc,
+            'TC as % of Capital': total_tc / self.config.initial_capital
+        }
+
+
 def run_multi_asset_backtest(
     signals_dict: Dict[str, pd.DataFrame],
     prices_dict: Dict[str, pd.DataFrame],
-    config: PortfolioConfig
-) -> Tuple[PortfolioManager, pd.DataFrame, pd.DataFrame]:
+    config: PortfolioConfig,
+    return_pm: bool = False
+) -> Tuple['PortfolioManager', pd.DataFrame, pd.DataFrame]:
     """
     Run a multi-asset backtest with portfolio management.
+    
+    This is the main entry point for backtesting. It orchestrates the backtest
+    process and can return either the full PortfolioManager state or a lightweight
+    BacktestResult object.
     
     Args:
         signals_dict: {ticker: df_with_Signal_column}
         prices_dict: {ticker: df_with_OHLC}
         config: PortfolioConfig
+        return_pm: If True, return full PortfolioManager object
+                   If False, return lightweight BacktestResult
         
     Returns:
-        (portfolio_manager, equity_curve_df, trades_df)
+        (backtest_result, equity_curve_df, trades_df)
+        - backtest_result: PortfolioManager or BacktestResult object
+        - equity_curve_df: DataFrame with portfolio equity over time
+        - trades_df: DataFrame with all trades
+    """
+    pm = _run_backtest(signals_dict, prices_dict, config)
+    equity_curve = pm.get_equity_curve()
+    trades = pm.get_trades_df()
+    
+    if return_pm:
+        return pm, equity_curve, trades
+    else:
+        # Return lightweight BacktestResult for walk-forward optimization
+        result = BacktestResult(equity_curve, trades, config)
+        return result, equity_curve, trades
+
+
+def _run_backtest(
+    signals_dict: Dict[str, pd.DataFrame],
+    prices_dict: Dict[str, pd.DataFrame],
+    config: PortfolioConfig
+) -> PortfolioManager:
+    """
+    Core backtest implementation.
+    
+    Runs the portfolio through historical data, handling:
+    - Signal changes (entries/exits)
+    - Position value updates
+    - Drift-based rebalancing
+    - Transaction cost tracking
     """
     # Initialize portfolio manager
     pm = PortfolioManager(config)
@@ -508,7 +629,7 @@ def run_multi_asset_backtest(
         # Record portfolio state
         pm.equity_curve.append(pm.get_portfolio_state(date))
     
-    return pm, pm.get_equity_curve(), pm.get_trades_df()
+    return pm
 
 
 if __name__ == "__main__":
@@ -519,7 +640,7 @@ if __name__ == "__main__":
     print("Testing PortfolioManager...")
     
     # Load data
-    prices = load_assets(['ES', 'GC'], start_date='2020-01-01')
+    prices = load_assets(['ES', 'GC'], start_date='2015-01-01')
     
     # Generate signals
     signal_gen = UnifiedMomentumSignal(lookback=50, entry_z=2.0, exit_z=0.5, sma_period=200)
