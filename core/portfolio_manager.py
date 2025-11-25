@@ -55,8 +55,7 @@ class PortfolioManager:
         
     def initialize_positions(self, prices: Dict[str, float], signals: Dict[str, int]):
         """
-        Initialize positions based on active signals.
-        Allocates capital equally among active signals.
+        Initialize positions based on signals.
         
         Args:
             prices: {ticker: initial_price}
@@ -64,6 +63,12 @@ class PortfolioManager:
         """
         # Get active signals and calculate equal weights
         target_weights = self.calculate_target_allocation(signals)
+        
+        # Calculate total target exposure
+        total_target_weight = sum(w for w in target_weights.values() if w > 0)
+        
+        # If total weight > 1.0, we'll need to use leverage (negative cash)
+        # This is intentional for portfolios with max_position_size > 1/n_assets
         
         # Allocate capital according to active signals
         for ticker, target_weight in target_weights.items():

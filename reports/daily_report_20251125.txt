@@ -1,0 +1,51 @@
+============================================================
+PAPER TRADING DAILY REPORT
+============================================================
+
+As of: 2025-11-25
+
+Portfolio Value: $131,019.87
+  Cash: $-5,003.33
+  Invested: $136,023.20
+  Total Return: 31.02%
+
+📍 Open Positions: 3
+
+  ES:
+    Shares: 6
+    Current: $6784.25
+    Value: $42,678.99
+    Entry: $5653.25 on 2025-03-31
+    Unrealized P&L: $7,115.00 (+20.01%)
+
+  GC:
+    Shares: 11
+    Current: $4167.50
+    Value: $47,461.55
+    Entry: $3122.80 on 2025-03-31
+    Unrealized P&L: $11,897.56 (+33.45%)
+
+  NQ:
+    Shares: 2
+    Current: $25079.75
+    Value: $45,882.66
+    Entry: $19439.50 on 2025-03-31
+    Unrealized P&L: $10,318.67 (+29.01%)
+
+📊 Current Signals:
+  ES: LONG
+  GC: LONG
+  NQ: LONG
+
+📈 Live Performance (from 2025-01-01):
+  Return: 31.02%
+  P&L: $31,019.87
+  Trades: 3
+  Days: 228
+
+📊 Backtest Reference:
+  Total Return: 122.05%
+  CAGR: 8.15%
+  Sharpe: 0.726
+
+============================================================
