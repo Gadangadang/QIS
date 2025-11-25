@@ -685,17 +685,27 @@ def _run_backtest(
     
     # Initialize correlation matrix if risk manager exists
     if config.risk_manager:
-        # Build initial returns dataframe for correlation (need at least 60 days)
+        # Build initial returns dataframe for correlation
+        # Use the first 60+ days of the backtest period for initialization
         returns_data = {}
         for ticker, df in prices_dict.items():
-            # Get returns from start to first_date
-            mask = df.index <= first_date
-            if mask.sum() >= 60:
-                returns_data[ticker] = df.loc[mask, 'Close'].pct_change()
+            # Try to get data before first_date (historical warm-up data)
+            mask_before = df.index < first_date
+            
+            if mask_before.sum() >= 60:
+                # We have historical data before backtest start - use it!
+                hist_data = df.loc[mask_before, 'Close'].tail(60)
+                returns_data[ticker] = hist_data.pct_change().dropna()
+            else:
+                # No historical data - use first 60 days of backtest period
+                mask_first = (df.index >= first_date) & (df.index <= df.index[min(59, len(df)-1)])
+                if mask_first.sum() >= 20:  # Need at least 20 days
+                    hist_data = df.loc[mask_first, 'Close']
+                    returns_data[ticker] = hist_data.pct_change().dropna()
         
-        if returns_data:
+        if returns_data and len(returns_data) >= 2:  # Need at least 2 assets
             returns_df = pd.DataFrame(returns_data).dropna()
-            if len(returns_df) >= 60:
+            if len(returns_df) >= 10:  # Minimum 10 returns for correlation
                 config.risk_manager.update_correlations(returns_df)
     
     # Track iteration for periodic correlation updates
@@ -737,8 +747,8 @@ def _run_backtest(
         if config.risk_manager:
             current_value = pm.portfolio_value
             equity_series = pd.Series([state['TotalValue'] for state in pm.equity_curve])
-            peak = equity_series.max()
-            current_dd = (current_value - peak) / peak if peak > 0 else 0
+            peak = max(equity_series.max(), current_value) if len(equity_series) > 0 else current_value
+            current_dd = min(0, (current_value - peak) / peak) if peak > 0 else 0  # Drawdown is always ≤ 0
             
             should_stop, reason = config.risk_manager.check_stop_conditions(
                 current_drawdown=current_dd,
@@ -778,8 +788,8 @@ def _run_backtest(
             
             # Calculate drawdown
             equity_series = pd.Series([state['TotalValue'] for state in pm.equity_curve])
-            peak = equity_series.max()
-            drawdown = (current_value - peak) / peak if peak > 0 else 0
+            peak = max(equity_series.max(), current_value) if len(equity_series) > 0 else current_value
+            drawdown = min(0, (current_value - peak) / peak) if peak > 0 else 0  # Drawdown is always ≤ 0
             
             # Log metrics
             config.risk_manager.log_metrics(

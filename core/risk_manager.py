@@ -228,7 +228,8 @@ class RiskManager:
         metrics['num_positions'] = len([w for w in weights.values() if w != 0])
         metrics['max_position_weight'] = max(abs(w) for w in weights.values()) if weights else 0
         
-        if self.correlation_matrix is not None and len(weights) > 0:
+        # Always calculate portfolio volatility if we have positions
+        if len(weights) > 0:
             port_vol = self._calculate_portfolio_volatility(weights)
             metrics['portfolio_volatility'] = port_vol
         else:

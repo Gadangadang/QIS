@@ -161,10 +161,12 @@ class RiskDashboard:
         
         # Plot 5: Drawdown
         if 'drawdown' in risk_metrics_df.columns:
+            # Drawdown is stored as negative values (≤ 0)
+            # Plot as positive values going downward for better visualization
             fig.add_trace(
                 go.Scatter(
                     x=risk_metrics_df['date'],
-                    y=risk_metrics_df['drawdown'] * 100,
+                    y=risk_metrics_df['drawdown'] * -100,  # Negate to show as positive going down
                     mode='lines',
                     name='Drawdown',
                     line=dict(color='red', width=2),
@@ -174,6 +176,9 @@ class RiskDashboard:
                 ),
                 row=3, col=1
             )
+            # Add reference line at 0%
+            fig.add_hline(y=0, line_dash="solid", line_color="gray", 
+                         line_width=1, opacity=0.5, row=3, col=1)
         
         # Plot 6: Correlation heatmap
         if correlation_matrix is not None and not correlation_matrix.empty:
@@ -217,6 +222,9 @@ class RiskDashboard:
         fig.update_yaxes(title_text="Weight (%)", row=2, col=1)
         fig.update_yaxes(title_text="Volatility (%)", row=2, col=2)
         fig.update_yaxes(title_text="Drawdown (%)", row=3, col=1)
+        
+        # Invert drawdown y-axis so drawdowns go downward from 0
+        fig.update_yaxes(autorange='reversed', row=3, col=1)
         
         # Generate HTML
         html_content = self._wrap_in_html(
