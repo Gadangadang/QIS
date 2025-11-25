@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional
+from datetime import datetime, timedelta
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DATASET_DIR = PROJECT_ROOT / "Dataset"
@@ -21,6 +22,7 @@ class MultiAssetLoader:
     - Data cleaning (remove invalid rows)
     - Consistent column naming
     - Forward-fill for missing data within gaps
+    - Fetch recent data from yfinance if needed
     """
     
     # Map ticker symbols to filenames
@@ -31,9 +33,23 @@ class MultiAssetLoader:
         #'SPX': 'spx_1990_2025.csv'
     }
     
-    def __init__(self, dataset_dir: Optional[Path] = None):
-        """Initialize loader with dataset directory."""
+    # Map tickers to yfinance symbols
+    YFINANCE_SYMBOLS = {
+        'ES': 'ES=F',
+        'NQ': 'NQ=F',
+        'GC': 'GC=F',
+    }
+    
+    def __init__(self, dataset_dir: Optional[Path] = None, use_yfinance: bool = True):
+        """
+        Initialize loader with dataset directory.
+        
+        Args:
+            dataset_dir: Path to dataset directory
+            use_yfinance: If True, fetch recent data from yfinance to supplement CSV files
+        """
         self.dataset_dir = dataset_dir or DATASET_DIR
+        self.use_yfinance = use_yfinance
         
     def load_single_asset(self, ticker: str) -> pd.DataFrame:
         """
@@ -92,6 +108,54 @@ class MultiAssetLoader:
         
         return df
     
+    def fetch_yfinance_data(self, ticker: str, start_date: pd.Timestamp) -> Optional[pd.DataFrame]:
+        """
+        Fetch recent data from yfinance.
+        
+        Args:
+            ticker: Asset ticker (ES, NQ, GC)
+            start_date: Start date for fetch (typically day after CSV ends)
+            
+        Returns:
+            DataFrame with recent data, or None if fetch fails
+        """
+        if ticker not in self.YFINANCE_SYMBOLS:
+            return None
+        
+        try:
+            import yfinance as yf
+            
+            yf_symbol = self.YFINANCE_SYMBOLS[ticker]
+            yf_ticker = yf.Ticker(yf_symbol)
+            
+            # Fetch from start_date to today
+            end_date = datetime.now()
+            data = yf_ticker.history(start=start_date, end=end_date)
+            
+            if len(data) == 0:
+                return None
+            
+            # Convert to our format
+            df = pd.DataFrame({
+                'Date': data.index,
+                'Open': data['Open'].values,
+                'High': data['High'].values,
+                'Low': data['Low'].values,
+                'Close': data['Close'].values,
+                'Volume': data['Volume'].values,
+                'Ticker': ticker
+            })
+            
+            # Reset index and ensure Date is datetime (remove timezone)
+            df = df.reset_index(drop=True)
+            df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+            
+            return df
+            
+        except Exception as e:
+            print(f"  ⚠️  Failed to fetch yfinance data for {ticker}: {e}")
+            return None
+    
     def load_assets(
         self, 
         tickers: List[str],
@@ -120,6 +184,23 @@ class MultiAssetLoader:
         raw_data = {}
         for ticker in tickers:
             df = self.load_single_asset(ticker)
+            
+            # Try to append yfinance data if enabled and CSV data is old
+            if self.use_yfinance:
+                csv_end_date = df['Date'].max()
+                today = pd.Timestamp.now().normalize()
+                days_old = (today - csv_end_date).days
+                
+                if days_old > 7:  # If CSV is more than a week old
+                    print(f"  📡 CSV data is {days_old} days old, fetching recent data from yfinance...")
+                    yf_data = self.fetch_yfinance_data(ticker, csv_end_date + timedelta(days=1))
+                    
+                    if yf_data is not None and len(yf_data) > 0:
+                        # Append yfinance data to CSV data
+                        df = pd.concat([df, yf_data], ignore_index=True)
+                        df = df.drop_duplicates(subset=['Date']).sort_values('Date').reset_index(drop=True)
+                        print(f"  ✓ Added {len(yf_data)} days from yfinance (now through {df['Date'].max().date()})")
+            
             raw_data[ticker] = df
             print(f"✓ {ticker}: {len(df)} rows, {df['Date'].min().date()} to {df['Date'].max().date()}")
         
@@ -234,16 +315,21 @@ class MultiAssetLoader:
 
 def load_assets(tickers: List[str], **kwargs) -> Dict[str, pd.DataFrame]:
     """
-    Convenience function to load and align assets.
+    Convenience function to load and align multiple assets.
+    Automatically fetches recent data from yfinance if CSV files are outdated.
     
     Args:
         tickers: List of tickers (e.g., ['ES', 'GC', 'NQ'])
         **kwargs: Additional arguments for MultiAssetLoader.load_assets()
+            - start_date: Optional start date filter
+            - end_date: Optional end date filter
+            - use_yfinance: If True (default), fetch recent data from yfinance
         
     Returns:
         Dictionary mapping ticker -> aligned DataFrame
     """
-    loader = MultiAssetLoader()
+    use_yfinance = kwargs.pop('use_yfinance', True)
+    loader = MultiAssetLoader(use_yfinance=use_yfinance)
     return loader.load_assets(tickers, **kwargs)
 
 
