@@ -75,7 +75,13 @@ class Reporter:
         # Prepare data
         equity_df = equity_df.copy()
         if 'Date' in equity_df.columns:
+            # Ensure Date column is datetime before setting as index
+            equity_df['Date'] = pd.to_datetime(equity_df['Date'])
             equity_df.set_index('Date', inplace=True)
+        
+        # Ensure index is datetime
+        if not isinstance(equity_df.index, pd.DatetimeIndex):
+            equity_df.index = pd.to_datetime(equity_df.index)
         
         equity = equity_df['TotalValue']
         returns = equity.pct_change().fillna(0)

@@ -58,13 +58,15 @@ class SingleAssetWrapper(MultiAssetSignal):
         
         for ticker, df in prices.items():
             # Generate signal for this asset
-            signal_df = self.signal_model.generate(df)
+            signal_df = self.signal_model.generate(df.copy())
             
-            # Handle both 'Signal' and 'Position' column names
-            if 'Position' in signal_df.columns and 'Signal' not in signal_df.columns:
-                signal_df['Signal'] = signal_df['Position']
-            elif 'Signal' not in signal_df.columns:
-                raise ValueError(f"Signal model did not produce 'Signal' or 'Position' column for {ticker}")
+            # Ensure 'Signal' column exists (convert from 'Position' if needed)
+            if 'Signal' not in signal_df.columns:
+                if 'Position' in signal_df.columns:
+                    # Rename Position to Signal for consistency
+                    signal_df = signal_df.rename(columns={'Position': 'Signal'})
+                else:
+                    raise ValueError(f"Signal model did not produce 'Signal' or 'Position' column for {ticker}")
             
             signals[ticker] = signal_df
         
