@@ -78,7 +78,7 @@ class PortfolioManager:
             if signal != 0 and target_weight > 0:
                 # Calculate dollar allocation
                 target_value = self.config.initial_capital * target_weight
-                shares = target_value / price
+                shares = target_value / price # Should we only buy shares in integer volume?
                 
                 self.positions[ticker] = {
                     'shares': shares,
@@ -147,7 +147,7 @@ class PortfolioManager:
         
         # Check drift for active positions only
         for ticker in active_signals:
-            current_weight = self.positions.get(ticker, {}).get('weight', 0)
+            current_weight = self.positions.get(ticker, {}).get('weight', 0) # redundant?
             
             # Calculate weight among active positions only
             total_active_value = sum(
@@ -200,9 +200,9 @@ class PortfolioManager:
             # Calculate target shares
             target_shares = target_value_per_asset / price
             shares_to_trade = target_shares - current_shares
-            
-            if abs(shares_to_trade * price) > 10:  # Avoid tiny trades (<$10)
-                trade_value = shares_to_trade * price
+            trade_value = shares_to_trade * price
+            if abs(trade_value) > 10:  # Avoid tiny trades (<$10)
+                
                 tc = abs(trade_value) * (self.config.transaction_cost_bps / 10000)
                 
                 # Execute trade
@@ -728,7 +728,7 @@ def _run_backtest(
         
         # Update risk manager with daily returns
         if config.risk_manager:
-            for ticker in current_prices:
+            for ticker in current_prices: # Should be vectorized later
                 if ticker in prev_prices and prev_prices[ticker] > 0:
                     daily_return = (current_prices[ticker] / prev_prices[ticker]) - 1
                     config.risk_manager.update_returns(ticker, pd.Timestamp(date), daily_return)

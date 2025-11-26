@@ -196,8 +196,19 @@ class RiskManager:
         current_drawdown: float,
         equity_curve: pd.Series
     ) -> Tuple[bool, str]:
-        """Check if any stop conditions are triggered."""
-        if current_drawdown <= self.config.max_drawdown_stop:
+        """
+        Check if any stop conditions are triggered.
+        
+        Args:
+            current_drawdown: Current drawdown as negative value (e.g., -0.15 for -15%)
+            equity_curve: Series of portfolio values over time
+            
+        Returns:
+            (should_stop, reason)
+        """
+        # Drawdown is negative, so we check if it's LESS than (more negative than) the limit
+        # e.g., -0.25 < -0.20 means 25% drawdown exceeds 20% limit
+        if current_drawdown < self.config.max_drawdown_stop:
             reason = f"Max drawdown {current_drawdown:.2%} exceeds stop {self.config.max_drawdown_stop:.2%}"
             self._log_violation("PORTFOLIO", "drawdown_stop", reason)
             return True, reason
