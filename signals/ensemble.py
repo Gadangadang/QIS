@@ -4,6 +4,7 @@ import numpy as np
 from signals.base import SignalModel
 from signals.mean_reversion import MeanReversionSignal
 from signals.momentum import MomentumSignal
+from typing import List, Dict
 
 
 class EnsembleSignal(SignalModel):
@@ -153,4 +154,186 @@ class EnsembleSignalNew(SignalModel):
         # 5. Burn-in
         df.iloc[:200, df.columns.get_loc("Position")] = 0
 
+        return df
+
+
+class AdaptiveEnsemble(SignalModel):
+    """
+    Advanced ensemble that dynamically weights strategies based on recent performance.
+    
+    Key Features:
+    1. Combines multiple strategy types (momentum, mean reversion, trend following)
+    2. Calculates rolling Sharpe ratio for each strategy
+    3. Dynamically adjusts weights based on what's working
+    4. Includes volatility regime filter
+    5. Signal strength threshold to avoid weak trades
+    
+    This ensemble aims to beat buy-and-hold by:
+    - Adapting to changing market conditions
+    - Weighting strategies that are currently performing
+    - Staying flat when signals are weak or conflicting
+    
+    Example:
+        >>> from signals.momentum import MomentumSignalV2
+        >>> from signals.trend_following_long_short import TrendFollowingLongShort
+        >>> 
+        >>> strategies = [
+        ...     ('momentum', MomentumSignalV2(lookback=60), 0.4),
+        ...     ('trend_ls', TrendFollowingLongShort(), 0.6)
+        ... ]
+        >>> ensemble = AdaptiveEnsemble(strategies, method='adaptive')
+        >>> signals = ensemble.generate(price_data)
+    """
+    
+    def __init__(
+        self,
+        strategies: List[tuple],
+        method: str = 'adaptive',
+        adaptive_lookback: int = 60,
+        signal_threshold: float = 0.3,
+        rebalance_frequency: int = 20
+    ):
+        """
+        Initialize adaptive ensemble signal generator.
+        
+        Args:
+            strategies (List[tuple]): List of (name, SignalModel, initial_weight) tuples
+            method (str): 'weighted_average', 'majority_vote', 'unanimous', or 'adaptive'
+            adaptive_lookback (int): Rolling window for performance calculation
+            signal_threshold (float): Min combined signal strength for position
+            rebalance_frequency (int): How often to update adaptive weights
+        """
+        # Normalize weights
+        total_weight = sum(w for _, _, w in strategies)
+        self.strategies = [
+            (name, signal_gen, w / total_weight) 
+            for name, signal_gen, w in strategies
+        ]
+        
+        self.method = method
+        self.adaptive_lookback = adaptive_lookback
+        self.signal_threshold = signal_threshold
+        self.rebalance_frequency = rebalance_frequency
+        self.strategy_names = [name for name, _, _ in self.strategies]
+    
+    def _calculate_sharpe_ratio(self, returns: pd.Series, lookback: int) -> float:
+        """Calculate rolling Sharpe ratio."""
+        if len(returns) < lookback:
+            return 0.0
+        
+        recent_returns = returns.iloc[-lookback:]
+        mean_return = recent_returns.mean() * 252
+        std_return = recent_returns.std() * np.sqrt(252)
+        
+        if std_return == 0 or np.isnan(std_return):
+            return 0.0
+        
+        return mean_return / std_return
+    
+    def _update_adaptive_weights(
+        self, 
+        strategy_signals: Dict[str, pd.DataFrame],
+        prices: pd.DataFrame,
+        current_idx: int
+    ) -> Dict[str, float]:
+        """Calculate adaptive weights based on recent Sharpe ratios."""
+        if current_idx < self.adaptive_lookback + 20:
+            return {name: weight for name, _, weight in self.strategies}
+        
+        sharpe_ratios = {}
+        
+        for name, _, _ in self.strategies:
+            signal_df = strategy_signals[name]
+            signals = signal_df["Signal"].iloc[:current_idx]
+            
+            # Calculate strategy returns
+            price_returns = prices["Close"].pct_change()
+            strategy_returns = signals.shift(1) * price_returns
+            
+            sharpe = self._calculate_sharpe_ratio(strategy_returns, self.adaptive_lookback)
+            sharpe_ratios[name] = max(sharpe, 0)  # No negative weights
+        
+        # Convert Sharpe ratios to weights
+        total_sharpe = sum(sharpe_ratios.values())
+        
+        if total_sharpe == 0:
+            weights = {name: 1.0 / len(self.strategies) for name in self.strategy_names}
+        else:
+            weights = {name: sharpe / total_sharpe for name, sharpe in sharpe_ratios.items()}
+        
+        return weights
+    
+    def generate(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate adaptive ensemble signals.
+        
+        Returns DataFrame with individual strategy signals, weights, and final signal.
+        """
+        df = df.copy()
+        
+        # Generate signals from all strategies
+        strategy_signals = {}
+        for name, signal_gen, _ in self.strategies:
+            strategy_df = signal_gen.generate(df.copy())
+            strategy_signals[name] = strategy_df
+            df[f"{name}_Signal"] = strategy_df["Signal"]
+        
+        # Combine signals based on method
+        if self.method == 'weighted_average':
+            df["CombinedSignal"] = 0.0
+            for name, _, weight in self.strategies:
+                df["CombinedSignal"] += strategy_signals[name]["Signal"] * weight
+        
+        elif self.method == 'majority_vote':
+            df["CombinedSignal"] = sum(
+                strategy_signals[name]["Signal"] for name, _, _ in self.strategies
+            )
+            df["CombinedSignal"] = np.sign(df["CombinedSignal"])
+        
+        elif self.method == 'unanimous':
+            df["CombinedSignal"] = 0.0
+            for i in range(len(df)):
+                signals = [strategy_signals[name]["Signal"].iloc[i] for name, _, _ in self.strategies]
+                if all(s == 1 for s in signals):
+                    df.iloc[i, df.columns.get_loc("CombinedSignal")] = 1.0
+                elif all(s == -1 for s in signals):
+                    df.iloc[i, df.columns.get_loc("CombinedSignal")] = -1.0
+                else:
+                    df.iloc[i, df.columns.get_loc("CombinedSignal")] = 0.0
+        
+        elif self.method == 'adaptive':
+            df["CombinedSignal"] = 0.0
+            current_weights = {name: weight for name, _, weight in self.strategies}
+            
+            for i in range(len(df)):
+                # Update weights periodically
+                if i % self.rebalance_frequency == 0 and i > 0:
+                    current_weights = self._update_adaptive_weights(strategy_signals, df, i)
+                
+                # Calculate weighted signal
+                combined = sum(
+                    strategy_signals[name]["Signal"].iloc[i] * current_weights[name]
+                    for name, _, _ in self.strategies
+                )
+                df.iloc[i, df.columns.get_loc("CombinedSignal")] = combined
+                
+                # Store weights
+                for name in self.strategy_names:
+                    weight_col = f"{name}_Weight"
+                    if weight_col not in df.columns:
+                        df[weight_col] = 0.0
+                    df.iloc[i, df.columns.get_loc(weight_col)] = current_weights[name]
+        
+        # Apply signal threshold
+        df["SignalStrength"] = df["CombinedSignal"].abs()
+        df["Signal"] = 0
+        
+        df.loc[df["CombinedSignal"] > self.signal_threshold, "Signal"] = 1
+        df.loc[df["CombinedSignal"] < -self.signal_threshold, "Signal"] = -1
+        df.loc[df["SignalStrength"] < self.signal_threshold, "Signal"] = 0
+        
+        # Forward fill
+        df["Signal"] = df["Signal"].replace(0, np.nan).ffill().fillna(0)
+        df["Signal"] = df["Signal"].astype(int)
+        
         return df

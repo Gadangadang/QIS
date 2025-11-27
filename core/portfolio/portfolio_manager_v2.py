@@ -88,7 +88,9 @@ class PortfolioManagerV2:
     def run_backtest(
         self, 
         signals: Dict[str, pd.DataFrame],
-        prices: Dict[str, pd.DataFrame]
+        prices: Dict[str, pd.DataFrame],
+        benchmark_data: pd.DataFrame = None,
+        benchmark_name: str = None
     ) -> BacktestResult:
         """
         Run backtest with risk management and execution simulation.
@@ -98,6 +100,9 @@ class PortfolioManagerV2:
                     Index must be DatetimeIndex
             prices: Dict of ticker -> DataFrame with OHLC data
                    Must have 'Close' column, DatetimeIndex
+            benchmark_data: Optional benchmark data from BenchmarkLoader
+                          DataFrame with DatetimeIndex and 'TotalValue' column (base 100)
+            benchmark_name: Name of benchmark (e.g., 'SPY', 'VT')
             
         Returns:
             BacktestResult with equity curve, trades, and metrics
@@ -213,11 +218,23 @@ class PortfolioManagerV2:
         
         trades = pd.DataFrame(portfolio.closed_positions)
         
+        # Prepare benchmark data if provided
+        benchmark_equity = None
+        if benchmark_data is not None and len(equity_curve) > 0:
+            # Align benchmark to portfolio dates
+            benchmark_aligned = benchmark_data.reindex(equity_curve.index, method='ffill')
+            if 'TotalValue' in benchmark_aligned.columns:
+                # Scale benchmark to match initial capital (maintaining DataFrame structure)
+                benchmark_equity = pd.DataFrame(index=benchmark_aligned.index)
+                benchmark_equity['TotalValue'] = benchmark_aligned['TotalValue'] * (self.initial_capital / 100.0)
+            
         # Create and return BacktestResult
         return BacktestResult(
             equity_curve=equity_curve,
             trades=trades,
-            initial_capital=self.initial_capital
+            initial_capital=self.initial_capital,
+            benchmark_equity=benchmark_equity,
+            benchmark_name=benchmark_name
         )
     
     def _should_rebalance(self, date: pd.Timestamp, portfolio, prices: Dict[str, float]) -> bool:

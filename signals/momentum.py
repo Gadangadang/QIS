@@ -134,7 +134,7 @@ class MomentumSignalV2(SignalModel):
                 - Momentum: Rate of change over lookback period
                 - SMA{n}: Simple moving average for trend filter
                 - BullMarket: Boolean, True when price > SMA
-                - Position: Trading signal (1=long, 0=flat)
+                - Signal: Trading signal (1=long, 0=flat)
         
         Note:
             Warm-up period is max(lookback, sma_filter) + 20 bars.
@@ -157,15 +157,15 @@ class MomentumSignalV2(SignalModel):
         exit = (df["Momentum"] < self.exit_threshold) | ~df["BullMarket"]
         
         # Generate positions
-        df["Position"] = 0
-        df.loc[enter, "Position"] = 1
-        df.loc[exit, "Position"] = 0
+        df["Signal"] = 0
+        df.loc[enter, "Signal"] = 1
+        df.loc[exit, "Signal"] = 0
         
         # Forward fill (stay in position until exit trigger)
-        df["Position"] = df["Position"].replace(0, np.nan).ffill().fillna(0)
+        df["Signal"] = df["Signal"].replace(0, np.nan).ffill().fillna(0)
         
         # Burn-in (need max of lookback or sma_filter)
         warmup = max(self.lookback, self.sma_filter) + 20
-        df.iloc[:warmup, df.columns.get_loc("Position")] = 0
+        df.iloc[:warmup, df.columns.get_loc("Signal")] = 0
         
         return df

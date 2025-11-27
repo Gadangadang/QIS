@@ -27,6 +27,8 @@ class BacktestResult:
     equity_curve: pd.DataFrame  # Columns: Date (index), Cash, PositionsValue, TotalValue
     trades: pd.DataFrame  # Columns: ticker, entry_date, exit_date, pnl, return, etc.
     initial_capital: float = 100000.0
+    benchmark_equity: Optional[pd.DataFrame] = None  # Optional benchmark for comparison
+    benchmark_name: Optional[str] = None
     
     @property
     def final_equity(self) -> float:
@@ -58,6 +60,7 @@ class BacktestResult:
         
         Returns:
             Dict with Sharpe, CAGR, Max Drawdown, Win Rate, etc.
+            If benchmark is provided, also includes beta, alpha, tracking error, etc.
         """
         if len(self.equity_curve) == 0:
             return {
@@ -87,6 +90,11 @@ class BacktestResult:
             'Profit Factor': self._calculate_profit_factor(),
             'Total Trades': len(self.trades)
         }
+        
+        # Add benchmark metrics if available
+        if self.benchmark_equity is not None and len(self.benchmark_equity) > 0:
+            benchmark_metrics = self._calculate_benchmark_metrics()
+            metrics.update(benchmark_metrics)
         
         return metrics
     
@@ -167,6 +175,27 @@ class BacktestResult:
         
         return winning_trades / losing_trades
     
+    def _calculate_benchmark_metrics(self) -> Dict:
+        """Calculate benchmark-relative metrics."""
+        from core.benchmark import BenchmarkComparator
+        
+        try:
+            comparator = BenchmarkComparator()
+            bench_metrics = comparator.calculate_metrics(
+                self.equity_curve,
+                self.benchmark_equity,
+                risk_free_rate=0.02
+            )
+            
+            # Add benchmark name
+            if self.benchmark_name:
+                bench_metrics['Benchmark'] = self.benchmark_name
+            
+            return bench_metrics
+        except Exception as e:
+            print(f"⚠️  Could not calculate benchmark metrics: {e}")
+            return {}
+    
     def print_summary(self):
         """Print comprehensive performance summary."""
         print("\n" + "="*70)
@@ -184,6 +213,24 @@ class BacktestResult:
         print(f"{'Sortino Ratio':<25} {metrics['Sortino Ratio']:>12.2f}")
         print(f"{'Max Drawdown':<25} {metrics['Max Drawdown']:>12.2%}")
         print(f"{'Calmar Ratio':<25} {metrics['Calmar Ratio']:>12.2f}")
+        
+        # Benchmark metrics if available
+        if 'Beta (Full Period)' in metrics:
+            print(f"\n{'BENCHMARK COMPARISON':<35}")
+            print(f"{'-'*35}")
+            if 'Benchmark' in metrics:
+                print(f"{'Benchmark':<25} {metrics['Benchmark']:>12}")
+            print(f"{'Benchmark Return':<25} {metrics['Benchmark Return']:>12.2%}")
+            print(f"{'Relative Return':<25} {metrics['Relative Return']:>12.2%}")
+            print(f"{'Beta (Full Period)':<25} {metrics['Beta (Full Period)']:>12.2f}")
+            print(f"{'Beta (90-day avg)':<25} {metrics['Beta (90-day avg)']:>12.2f}")
+            print(f"{'Beta (1-year avg)':<25} {metrics['Beta (1-year avg)']:>12.2f}")
+            print(f"{'Alpha (Annual)':<25} {metrics['Alpha (Annual)']:>12.2%}")
+            print(f"{'Tracking Error':<25} {metrics['Tracking Error']:>12.2%}")
+            print(f"{'Information Ratio':<25} {metrics['Information Ratio']:>12.2f}")
+            print(f"{'Correlation':<25} {metrics['Correlation']:>12.2f}")
+            print(f"{'Up Capture Ratio':<25} {metrics['Up Capture Ratio']:>12.2f}")
+            print(f"{'Down Capture Ratio':<25} {metrics['Down Capture Ratio']:>12.2f}")
         
         # Trade statistics
         print(f"\n{'TRADE STATISTICS':<35}")

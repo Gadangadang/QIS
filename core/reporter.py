@@ -92,19 +92,30 @@ class Reporter:
         drawdown = (cumulative - peak) / peak
         
         # Create subplots
+        n_rows = 4 if benchmark_df is not None else 3
+        subplot_titles = [
+            'Equity Curve', 'Drawdown %',
+            'Daily Returns Distribution', 'Trade PnL Distribution',
+            'Cumulative Returns', 'Monthly Returns Heatmap'
+        ]
+        
+        if benchmark_df is not None:
+            subplot_titles.extend(['Rolling Beta (90-day)', 'Base 100 Comparison'])
+        
+        specs = [
+            [{'type': 'scatter'}, {'type': 'scatter'}],
+            [{'type': 'histogram'}, {'type': 'histogram'}],
+            [{'type': 'scatter'}, {'type': 'heatmap'}]
+        ]
+        
+        if benchmark_df is not None:
+            specs.append([{'type': 'scatter'}, {'type': 'scatter'}])
+        
         fig = make_subplots(
-            rows=3, cols=2,
-            subplot_titles=(
-                'Equity Curve', 'Drawdown %',
-                'Daily Returns Distribution', 'Trade PnL Distribution',
-                'Cumulative Returns', 'Monthly Returns Heatmap'
-            ),
-            specs=[
-                [{'type': 'scatter'}, {'type': 'scatter'}],
-                [{'type': 'histogram'}, {'type': 'histogram'}],
-                [{'type': 'scatter'}, {'type': 'heatmap'}]
-            ],
-            vertical_spacing=0.12,
+            rows=n_rows, cols=2,
+            subplot_titles=subplot_titles[:n_rows*2],
+            specs=specs,
+            vertical_spacing=0.10,
             horizontal_spacing=0.1
         )
         
@@ -204,9 +215,57 @@ class Reporter:
                 row=3, col=2
             )
         
+        # 7 & 8. Benchmark comparison charts (if benchmark provided)
+        if benchmark_df is not None:
+            from core.benchmark import BenchmarkComparator
+            
+            # Calculate benchmark metrics
+            comparator = BenchmarkComparator()
+            bench_metrics = comparator.calculate_metrics(equity_df, benchmark_df)
+            
+            # 7. Rolling beta (90-day)
+            if 'rolling_beta_90d' in bench_metrics and not bench_metrics['rolling_beta_90d'].empty:
+                rolling_beta = bench_metrics['rolling_beta_90d']
+                fig.add_trace(
+                    go.Scatter(
+                        x=rolling_beta.index,
+                        y=rolling_beta.values,
+                        name='Beta (90d)',
+                        line=dict(color='purple', width=2),
+                        hovertemplate='%{x}<br>Beta: %{y:.2f}<extra></extra>'
+                    ),
+                    row=4, col=1
+                )
+                # Add horizontal line at beta=1
+                fig.add_hline(y=1.0, line_dash="dash", line_color="gray", row=4, col=1)
+            
+            # 8. Base 100 comparison
+            port_norm, bench_norm = comparator.format_for_base_100(equity_df, benchmark_df)
+            fig.add_trace(
+                go.Scatter(
+                    x=port_norm.index,
+                    y=port_norm['TotalValue'],
+                    name='Portfolio (Base 100)',
+                    line=dict(color='blue', width=2),
+                    hovertemplate='%{x}<br>Value: %{y:.2f}<extra></extra>'
+                ),
+                row=4, col=2
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=bench_norm.index,
+                    y=bench_norm['TotalValue'],
+                    name='Benchmark (Base 100)',
+                    line=dict(color='gray', width=2, dash='dash'),
+                    hovertemplate='%{x}<br>Value: %{y:.2f}<extra></extra>'
+                ),
+                row=4, col=2
+            )
+            fig.add_hline(y=100, line_dash="dot", line_color="gray", row=4, col=2)
+        
         # Update layout
         fig.update_layout(
-            height=1200,
+            height=1200 if benchmark_df is None else 1600,
             title_text=f"{title}: {equity.index[0].date()} to {equity.index[-1].date()}",
             showlegend=True,
             legend=dict(x=0.01, y=0.99)
@@ -226,6 +285,12 @@ class Reporter:
         fig.update_yaxes(title_text="Count", row=2, col=2)
         fig.update_yaxes(title_text="Cumulative Return", row=3, col=1)
         fig.update_yaxes(title_text="Year", row=3, col=2)
+        
+        if benchmark_df is not None:
+            fig.update_xaxes(title_text="Date", row=4, col=1)
+            fig.update_xaxes(title_text="Date", row=4, col=2)
+            fig.update_yaxes(title_text="Beta", row=4, col=1)
+            fig.update_yaxes(title_text="Value (Base 100)", row=4, col=2)
         
         # Build HTML components
         metrics_html = self._metrics_to_html(metrics)

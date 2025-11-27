@@ -56,7 +56,7 @@ class MeanReversionSignal(SignalModel):
         Returns:
             pd.DataFrame: Original DataFrame with added columns:
                 - Z: Z-score of price relative to rolling mean/std
-                - Position: Trading signal (1=long, -1=short, 0=flat)
+                - Signal: Trading signal (1=long, -1=short, 0=flat)
         
         Logic:
             - If flat and Z < -entry_z: Go long (oversold)
@@ -74,40 +74,40 @@ class MeanReversionSignal(SignalModel):
         std = close.rolling(self.window).std()
         df["Z"] = (close - sma) / std
 
-        # Initialize position column
-        df["Position"] = 0
+        # Initialize signal column
+        df["Signal"] = 0
         
         # Build positions bar-by-bar
         for i in range(self.window, len(df)):
-            prev_position = df.iloc[i - 1]["Position"]
+            prev_signal = df.iloc[i - 1]["Signal"]
             z_score = df.iloc[i]["Z"]
             
             # If flat, check for entry
-            if prev_position == 0:
+            if prev_signal == 0:
                 if z_score <= -self.entry_z:
-                    df.iloc[i, df.columns.get_loc("Position")] = 1  # Long entry
+                    df.iloc[i, df.columns.get_loc("Signal")] = 1  # Long entry
                 elif z_score >= self.entry_z:
-                    df.iloc[i, df.columns.get_loc("Position")] = -1  # Short entry
+                    df.iloc[i, df.columns.get_loc("Signal")] = -1  # Short entry
                 else:
-                    df.iloc[i, df.columns.get_loc("Position")] = 0  # Stay flat
+                    df.iloc[i, df.columns.get_loc("Signal")] = 0  # Stay flat
             
             # If holding long, check for exit
-            elif prev_position == 1:
+            elif prev_signal == 1:
                 if z_score >= -self.exit_z:  # Mean reversion: exit when Z crosses back toward zero
-                    df.iloc[i, df.columns.get_loc("Position")] = 0
+                    df.iloc[i, df.columns.get_loc("Signal")] = 0
                 elif z_score > self.entry_z:  # Stop loss: price moved against us
-                    df.iloc[i, df.columns.get_loc("Position")] = 0
+                    df.iloc[i, df.columns.get_loc("Signal")] = 0
                 else:
-                    df.iloc[i, df.columns.get_loc("Position")] = 1  # Hold
+                    df.iloc[i, df.columns.get_loc("Signal")] = 1  # Hold
             
             # If holding short, check for exit
-            elif prev_position == -1:
+            elif prev_signal == -1:
                 if z_score <= self.exit_z:  # Mean reversion: exit when Z crosses back toward zero
-                    df.iloc[i, df.columns.get_loc("Position")] = 0
+                    df.iloc[i, df.columns.get_loc("Signal")] = 0
                 elif z_score < -self.entry_z:  # Stop loss: price moved against us
-                    df.iloc[i, df.columns.get_loc("Position")] = 0
+                    df.iloc[i, df.columns.get_loc("Signal")] = 0
                 else:
-                    df.iloc[i, df.columns.get_loc("Position")] = -1  # Hold
+                    df.iloc[i, df.columns.get_loc("Signal")] = -1  # Hold
 
-        df["Position"] = df["Position"].astype(int)
+        df["Signal"] = df["Signal"].astype(int)
         return df

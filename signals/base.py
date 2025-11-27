@@ -11,7 +11,7 @@ class SignalModel(ABC):
     price data and returns a DataFrame with trading signals.
     
     Signal Convention:
-        Position/Signal column values:
+        Signal column values:
         - 1: Long position
         - 0: Flat (no position)
         - -1: Short position (if strategy supports shorting)
@@ -20,7 +20,7 @@ class SignalModel(ABC):
         >>> class MySignal(SignalModel):
         ...     def generate(self, df):
         ...         df = df.copy()
-        ...         df['Position'] = 1  # Always long
+        ...         df['Signal'] = 1  # Always long
         ...         return df
     """
     
@@ -34,7 +34,7 @@ class SignalModel(ABC):
                              Must have 'Close' column at minimum.
         
         Returns:
-            pd.DataFrame: Original DataFrame with added 'Position' or 'Signal' column.
+            pd.DataFrame: Original DataFrame with added 'Signal' column.
                          Column should contain: 1 (long), 0 (flat), or -1 (short).
         
         Raises:

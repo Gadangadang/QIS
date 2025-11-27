@@ -1,521 +1,779 @@
 """
 Risk Dashboard Module
-Creates interactive visualizations for risk management metrics.
+Generates comprehensive risk analysis HTML dashboards for portfolios.
 
-This module provides comprehensive risk visualization including:
-- Leverage tracking
-- Position sizing over time
-- Correlation heatmaps
-- Risk contribution analysis
-- Drawdown monitoring
-- Violation alerts
+Features:
+- Value at Risk (VaR) and Conditional VaR
+- Drawdown analysis with underwater charts
+- Strategy correlation matrix
+- Rolling risk metrics (volatility, Sharpe, beta)
+- Position concentration analysis
+- Risk-adjusted performance metrics
 """
 
-from typing import Dict, Optional, List
 import pandas as pd
 import numpy as np
+from typing import Dict, Optional, List
 from datetime import datetime
-from pathlib import Path
-
-try:
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    import plotly.express as px
-    HAS_PLOTLY = True
-except ImportError:
-    HAS_PLOTLY = False
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+from scipy import stats
 
 
 class RiskDashboard:
     """
-    Creates interactive risk management dashboards.
+    Generates risk-focused HTML dashboards for portfolio analysis.
     
-    Features:
-    - Real-time risk metrics tracking
-    - Interactive Plotly charts
-    - Violation alerts and warnings
+    Provides:
+    - Comprehensive risk metrics
     - Correlation analysis
-    - Position sizing visualization
+    - Drawdown visualization
+    - Rolling risk measures
+    - VaR/CVaR calculations
     """
     
-    def __init__(self, output_dir: str = 'reports'):
-        """
-        Initialize risk dashboard.
-        
-        Args:
-            output_dir: Directory to save HTML reports
-        """
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        if not HAS_PLOTLY:
-            print("Warning: Plotly not installed. Install with: pip install plotly")
+    def __init__(self):
+        """Initialize risk dashboard."""
+        pass
     
     def generate_dashboard(
         self,
-        risk_metrics_df: pd.DataFrame,
-        violations_df: Optional[pd.DataFrame] = None,
-        correlation_matrix: Optional[pd.DataFrame] = None,
-        equity_df: Optional[pd.DataFrame] = None,
-        title: str = "Risk Management Dashboard",
-        save_path: Optional[str] = None
+        strategy_results: Dict,
+        combined_equity: pd.DataFrame,
+        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_name: str = "Benchmark",
+        title: str = "Portfolio Risk Dashboard"
     ) -> str:
         """
-        Generate comprehensive risk dashboard.
+        Generate comprehensive risk analysis HTML dashboard.
         
         Args:
-            risk_metrics_df: DataFrame with risk metrics history
-            violations_df: DataFrame with violation history (optional)
-            correlation_matrix: Correlation matrix (optional)
-            equity_df: Equity curve dataframe (optional)
+            strategy_results: Dict of {strategy_name: {'result': BacktestResult, 'capital': float}}
+            combined_equity: DataFrame with combined portfolio equity curve
+            benchmark_data: Optional benchmark equity DataFrame
+            benchmark_name: Name of benchmark
             title: Dashboard title
-            save_path: Path to save HTML file (optional)
-        
-        Returns:
-            HTML string of the dashboard
-        """
-        if not HAS_PLOTLY:
-            return self._generate_basic_dashboard(risk_metrics_df, violations_df)
-        
-        # Create subplots
-        fig = make_subplots(
-            rows=3, cols=2,
-            subplot_titles=(
-                'Leverage Over Time',
-                'Number of Positions',
-                'Max Position Weight',
-                'Portfolio Volatility',
-                'Drawdown',
-                'Correlation Heatmap'
-            ),
-            specs=[
-                [{'type': 'scatter'}, {'type': 'scatter'}],
-                [{'type': 'scatter'}, {'type': 'scatter'}],
-                [{'type': 'scatter'}, {'type': 'heatmap'}]
-            ],
-            vertical_spacing=0.12,
-            horizontal_spacing=0.15
-        )
-        
-        # Plot 1: Leverage over time
-        if 'leverage' in risk_metrics_df.columns:
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_metrics_df['date'],
-                    y=risk_metrics_df['leverage'],
-                    mode='lines',
-                    name='Leverage',
-                    line=dict(color='blue', width=2),
-                    hovertemplate='%{x}<br>Leverage: %{y:.2f}x<extra></extra>'
-                ),
-                row=1, col=1
-            )
-            # Add threshold line at 1.0x
-            fig.add_hline(y=1.0, line_dash="dash", line_color="red", 
-                         annotation_text="Max Leverage", row=1, col=1)
-        
-        # Plot 2: Number of positions
-        if 'num_positions' in risk_metrics_df.columns:
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_metrics_df['date'],
-                    y=risk_metrics_df['num_positions'],
-                    mode='lines+markers',
-                    name='# Positions',
-                    line=dict(color='green', width=2),
-                    marker=dict(size=4),
-                    hovertemplate='%{x}<br>Positions: %{y}<extra></extra>'
-                ),
-                row=1, col=2
-            )
-        
-        # Plot 3: Max position weight
-        if 'max_position_weight' in risk_metrics_df.columns:
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_metrics_df['date'],
-                    y=risk_metrics_df['max_position_weight'] * 100,
-                    mode='lines',
-                    name='Max Weight',
-                    line=dict(color='orange', width=2),
-                    fill='tozeroy',
-                    fillcolor='rgba(255, 165, 0, 0.2)',
-                    hovertemplate='%{x}<br>Max Weight: %{y:.1f}%<extra></extra>'
-                ),
-                row=2, col=1
-            )
-        
-        # Plot 4: Portfolio volatility
-        if 'portfolio_volatility' in risk_metrics_df.columns:
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_metrics_df['date'],
-                    y=risk_metrics_df['portfolio_volatility'] * 100,
-                    mode='lines',
-                    name='Vol',
-                    line=dict(color='purple', width=2),
-                    hovertemplate='%{x}<br>Vol: %{y:.1f}%<extra></extra>'
-                ),
-                row=2, col=2
-            )
-        
-        # Plot 5: Drawdown
-        if 'drawdown' in risk_metrics_df.columns:
-            # Drawdown is stored as negative values (≤ 0)
-            # Plot as positive values going downward for better visualization
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_metrics_df['date'],
-                    y=risk_metrics_df['drawdown'] * -100,  # Negate to show as positive going down
-                    mode='lines',
-                    name='Drawdown',
-                    line=dict(color='red', width=2),
-                    fill='tozeroy',
-                    fillcolor='rgba(255, 0, 0, 0.2)',
-                    hovertemplate='%{x}<br>DD: %{y:.1f}%<extra></extra>'
-                ),
-                row=3, col=1
-            )
-            # Add reference line at 0%
-            fig.add_hline(y=0, line_dash="solid", line_color="gray", 
-                         line_width=1, opacity=0.5, row=3, col=1)
-        
-        # Plot 6: Correlation heatmap
-        if correlation_matrix is not None and not correlation_matrix.empty:
-            fig.add_trace(
-                go.Heatmap(
-                    z=correlation_matrix.values,
-                    x=correlation_matrix.columns,
-                    y=correlation_matrix.index,
-                    colorscale='RdBu_r',
-                    zmid=0,
-                    zmin=-1,
-                    zmax=1,
-                    text=correlation_matrix.values,
-                    texttemplate='%{text:.2f}',
-                    textfont={"size": 10},
-                    hovertemplate='%{x} vs %{y}<br>Corr: %{z:.2f}<extra></extra>',
-                    showscale=True,
-                    colorbar=dict(title="Correlation")
-                ),
-                row=3, col=2
-            )
-        
-        # Update layout
-        fig.update_layout(
-            title=dict(
-                text=f"<b>{title}</b>",
-                x=0.5,
-                xanchor='center',
-                font=dict(size=20)
-            ),
-            height=1200,
-            showlegend=False,
-            hovermode='x unified',
-            template='plotly_white'
-        )
-        
-        # Update axes
-        fig.update_xaxes(title_text="Date", row=3, col=1)
-        fig.update_yaxes(title_text="Leverage", row=1, col=1)
-        fig.update_yaxes(title_text="Count", row=1, col=2)
-        fig.update_yaxes(title_text="Weight (%)", row=2, col=1)
-        fig.update_yaxes(title_text="Volatility (%)", row=2, col=2)
-        fig.update_yaxes(title_text="Drawdown (%)", row=3, col=1)
-        
-        # Invert drawdown y-axis so drawdowns go downward from 0
-        fig.update_yaxes(autorange='reversed', row=3, col=1)
-        
-        # Generate HTML
-        html_content = self._wrap_in_html(
-            fig.to_html(include_plotlyjs='cdn', full_html=False),
-            title,
-            risk_metrics_df,
-            violations_df
-        )
-        
-        # Save if path provided
-        if save_path:
-            save_path = Path(save_path)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path, 'w') as f:
-                f.write(html_content)
-            print(f"✅ Dashboard saved to: {save_path}")
-        
-        return html_content
-    
-    def _wrap_in_html(
-        self,
-        plotly_html: str,
-        title: str,
-        risk_metrics_df: pd.DataFrame,
-        violations_df: Optional[pd.DataFrame]
-    ) -> str:
-        """Wrap Plotly charts in complete HTML with styling."""
-        
-        # Generate summary stats
-        summary_html = self._generate_summary_stats(risk_metrics_df)
-        
-        # Generate violations table
-        violations_html = ""
-        if violations_df is not None and not violations_df.empty:
-            violations_html = self._generate_violations_table(violations_df)
-        
-        html_template = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>{title}</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    margin: 0;
-                    padding: 20px;
-                    background-color: #f5f5f5;
-                }}
-                .container {{
-                    max-width: 1400px;
-                    margin: 0 auto;
-                    background-color: white;
-                    padding: 30px;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }}
-                h1 {{
-                    color: #2c3e50;
-                    margin-bottom: 10px;
-                    border-bottom: 3px solid #3498db;
-                    padding-bottom: 10px;
-                }}
-                .timestamp {{
-                    color: #7f8c8d;
-                    font-size: 14px;
-                    margin-bottom: 20px;
-                }}
-                .summary {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 15px;
-                    margin: 20px 0;
-                }}
-                .summary-card {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 20px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                }}
-                .summary-card h3 {{
-                    margin: 0 0 10px 0;
-                    font-size: 14px;
-                    opacity: 0.9;
-                }}
-                .summary-card .value {{
-                    font-size: 28px;
-                    font-weight: bold;
-                    margin: 0;
-                }}
-                .violations {{
-                    margin: 30px 0;
-                }}
-                .violations h2 {{
-                    color: #e74c3c;
-                    margin-bottom: 15px;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 10px 0;
-                }}
-                th, td {{
-                    padding: 12px;
-                    text-align: left;
-                    border-bottom: 1px solid #ddd;
-                }}
-                th {{
-                    background-color: #34495e;
-                    color: white;
-                    font-weight: 600;
-                }}
-                tr:hover {{
-                    background-color: #f5f5f5;
-                }}
-                .chart-container {{
-                    margin: 30px 0;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>{title}</h1>
-                <div class="timestamp">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
-                
-                {summary_html}
-                {violations_html}
-                
-                <div class="chart-container">
-                    {plotly_html}
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        return html_template
-    
-    def _generate_summary_stats(self, risk_metrics_df: pd.DataFrame) -> str:
-        """Generate summary statistics HTML."""
-        if risk_metrics_df.empty:
-            return ""
-        
-        # Calculate summary stats
-        avg_leverage = risk_metrics_df['leverage'].mean() if 'leverage' in risk_metrics_df.columns else 0
-        max_leverage = risk_metrics_df['leverage'].max() if 'leverage' in risk_metrics_df.columns else 0
-        avg_positions = risk_metrics_df['num_positions'].mean() if 'num_positions' in risk_metrics_df.columns else 0
-        avg_vol = risk_metrics_df['portfolio_volatility'].mean() if 'portfolio_volatility' in risk_metrics_df.columns else 0
-        max_dd = risk_metrics_df['drawdown'].min() if 'drawdown' in risk_metrics_df.columns else 0
-        
-        return f"""
-        <div class="summary">
-            <div class="summary-card">
-                <h3>Avg Leverage</h3>
-                <p class="value">{avg_leverage:.2f}x</p>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                <h3>Max Leverage</h3>
-                <p class="value">{max_leverage:.2f}x</p>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                <h3>Avg Positions</h3>
-                <p class="value">{avg_positions:.1f}</p>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                <h3>Avg Volatility</h3>
-                <p class="value">{avg_vol*100:.1f}%</p>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
-                <h3>Max Drawdown</h3>
-                <p class="value">{max_dd*100:.1f}%</p>
-            </div>
-        </div>
-        """
-    
-    def _generate_violations_table(self, violations_df: pd.DataFrame) -> str:
-        """Generate violations table HTML."""
-        if violations_df.empty:
-            return ""
-        
-        # Get recent violations
-        recent = violations_df.tail(20).copy()
-        
-        rows_html = ""
-        for _, row in recent.iterrows():
-            rows_html += f"""
-            <tr>
-                <td>{row.get('timestamp', 'N/A')}</td>
-                <td>{row.get('ticker', 'N/A')}</td>
-                <td>{row.get('type', 'N/A')}</td>
-                <td>{row.get('reason', 'N/A')}</td>
-            </tr>
-            """
-        
-        return f"""
-        <div class="violations">
-            <h2>⚠️ Risk Violations ({len(violations_df)} total)</h2>
-            <p>Showing most recent 20 violations:</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Ticker</th>
-                        <th>Type</th>
-                        <th>Reason</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows_html}
-                </tbody>
-            </table>
-        </div>
-        """
-    
-    def _generate_basic_dashboard(
-        self,
-        risk_metrics_df: pd.DataFrame,
-        violations_df: Optional[pd.DataFrame]
-    ) -> str:
-        """Generate basic HTML dashboard without Plotly."""
-        
-        summary_html = self._generate_summary_stats(risk_metrics_df)
-        violations_html = ""
-        if violations_df is not None and not violations_df.empty:
-            violations_html = self._generate_violations_table(violations_df)
-        
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Risk Dashboard (Basic)</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                h1 {{ color: #333; }}
-                .warning {{ color: #e74c3c; background: #fee; padding: 10px; }}
-            </style>
-        </head>
-        <body>
-            <h1>Risk Management Dashboard</h1>
-            <div class="warning">
-                <strong>Note:</strong> Install Plotly for interactive charts: pip install plotly
-            </div>
-            {summary_html}
-            {violations_html}
-        </body>
-        </html>
-        """
-    
-    def plot_position_sizing_comparison(
-        self,
-        methods_results: Dict[str, pd.DataFrame],
-        save_path: Optional[str] = None
-    ) -> str:
-        """
-        Compare different position sizing methods.
-        
-        Args:
-            methods_results: Dict of {method_name: equity_df}
-            save_path: Optional path to save HTML
-        
+            
         Returns:
             HTML string
         """
-        if not HAS_PLOTLY:
-            return "<html><body>Plotly required for comparison charts</body></html>"
+        html_sections = []
         
-        fig = go.Figure()
+        # Header
+        html_sections.append(self._generate_header(title))
         
-        for method_name, equity_df in methods_results.items():
-            fig.add_trace(go.Scatter(
-                x=equity_df['Date'] if 'Date' in equity_df.columns else equity_df.index,
-                y=equity_df['TotalValue'] if 'TotalValue' in equity_df.columns else equity_df['Equity'],
-                mode='lines',
-                name=method_name,
-                hovertemplate=f'{method_name}<br>%{{x}}<br>Value: $%{{y:,.0f}}<extra></extra>'
-            ))
+        # Risk Summary
+        html_sections.append(self._generate_risk_summary(
+            strategy_results, combined_equity
+        ))
         
-        fig.update_layout(
-            title="Position Sizing Methods Comparison",
-            xaxis_title="Date",
-            yaxis_title="Portfolio Value ($)",
-            hovermode='x unified',
-            template='plotly_white',
-            height=600
+        # Drawdown Analysis
+        html_sections.append(self._generate_drawdown_analysis(
+            strategy_results, combined_equity
+        ))
+        
+        # Correlation Matrix
+        html_sections.append(self._generate_correlation_matrix(
+            strategy_results, benchmark_data, benchmark_name
+        ))
+        
+        # Rolling Risk Metrics
+        html_sections.append(self._generate_rolling_risk_metrics(
+            combined_equity, benchmark_data, benchmark_name
+        ))
+        
+        # VaR and CVaR Analysis
+        html_sections.append(self._generate_var_analysis(
+            strategy_results, combined_equity
+        ))
+        
+        # Individual Strategy Risk Profiles
+        html_sections.append(self._generate_strategy_risk_profiles(
+            strategy_results
+        ))
+        
+        # Footer
+        html_sections.append(self._generate_footer())
+        
+        return '\n'.join(html_sections)
+    
+    def _generate_header(self, title: str) -> str:
+        """Generate HTML header."""
+        return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: #333;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }}
+        .header h1 {{
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }}
+        .header .subtitle {{
+            margin-top: 10px;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }}
+        .section {{
+            padding: 40px;
+            border-bottom: 1px solid #eee;
+        }}
+        .section:last-child {{
+            border-bottom: none;
+        }}
+        .section-title {{
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #f5576c;
+            border-left: 4px solid #f5576c;
+            padding-left: 15px;
+        }}
+        .metric-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }}
+        .metric-card {{
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #f5576c;
+        }}
+        .metric-card .label {{
+            font-size: 0.85em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .metric-card .value {{
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-top: 5px;
+            color: #333;
+        }}
+        .metric-card.good {{
+            border-left-color: #28a745;
+        }}
+        .metric-card.warning {{
+            border-left-color: #ffc107;
+        }}
+        .metric-card.bad {{
+            border-left-color: #dc3545;
+        }}
+        .chart-container {{
+            margin: 30px 0;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        th {{
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }}
+        td {{
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }}
+        tr:hover {{
+            background: #f8f9fa;
+        }}
+        .alert {{
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-weight: 500;
+        }}
+        .alert-warning {{
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }}
+        .alert-danger {{
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }}
+        .alert-success {{
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }}
+        .footer {{
+            text-align: center;
+            padding: 30px;
+            background: #f8f9fa;
+            color: #666;
+            font-size: 0.9em;
+        }}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>⚠️ {title}</h1>
+        <div class="subtitle">Comprehensive Risk Analysis & Metrics</div>
+        <div style="margin-top: 10px; opacity: 0.9; font-size: 0.9em;">
+            Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        </div>
+    </div>
+"""
+    
+    def _generate_risk_summary(
+        self,
+        strategy_results: Dict,
+        combined_equity: pd.DataFrame
+    ) -> str:
+        """Generate risk metrics summary."""
+        # Calculate portfolio metrics
+        returns = combined_equity['TotalValue'].pct_change().dropna()
+        
+        # Volatility
+        daily_vol = returns.std()
+        annual_vol = daily_vol * np.sqrt(252)
+        
+        # Sharpe & Sortino
+        sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+        downside_returns = returns[returns < 0]
+        sortino = (returns.mean() / downside_returns.std() * np.sqrt(252)) if len(downside_returns) > 0 and downside_returns.std() > 0 else 0
+        
+        # Max Drawdown
+        cumulative = combined_equity['TotalValue'] / combined_equity['TotalValue'].iloc[0]
+        peak = cumulative.cummax()
+        drawdown = (cumulative - peak) / peak
+        max_dd = drawdown.min()
+        
+        # VaR (95% and 99%)
+        var_95 = np.percentile(returns, 5)
+        var_99 = np.percentile(returns, 1)
+        
+        # CVaR (Expected Shortfall)
+        cvar_95 = returns[returns <= var_95].mean()
+        cvar_99 = returns[returns <= var_99].mean()
+        
+        # Calmar Ratio
+        total_return = (combined_equity['TotalValue'].iloc[-1] / combined_equity['TotalValue'].iloc[0] - 1)
+        years = len(returns) / 252
+        cagr = (1 + total_return) ** (1/years) - 1 if years > 0 else 0
+        calmar = cagr / abs(max_dd) if max_dd != 0 else 0
+        
+        # Skewness and Kurtosis
+        skew = stats.skew(returns)
+        kurt = stats.kurtosis(returns)
+        
+        # Risk assessment
+        risk_level = "Low" if annual_vol < 0.15 else "Medium" if annual_vol < 0.25 else "High"
+        risk_class = "good" if annual_vol < 0.15 else "warning" if annual_vol < 0.25 else "bad"
+        
+        summary_html = f"""
+    <div class="section">
+        <h2 class="section-title">Risk Metrics Summary</h2>
+        
+        <div class="alert alert-{'success' if risk_level == 'Low' else 'warning' if risk_level == 'Medium' else 'danger'}">
+            <strong>Overall Risk Level: {risk_level}</strong> - Annual volatility of {annual_vol:.2%}
+        </div>
+        
+        <div class="metric-grid">
+            <div class="metric-card {risk_class}">
+                <div class="label">Annual Volatility</div>
+                <div class="value">{annual_vol:.2%}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Sharpe Ratio</div>
+                <div class="value">{sharpe:.2f}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Sortino Ratio</div>
+                <div class="value">{sortino:.2f}</div>
+            </div>
+            <div class="metric-card {'bad' if max_dd < -0.20 else 'warning' if max_dd < -0.10 else 'good'}">
+                <div class="label">Max Drawdown</div>
+                <div class="value">{max_dd:.2%}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Calmar Ratio</div>
+                <div class="value">{calmar:.2f}</div>
+            </div>
+            <div class="metric-card bad">
+                <div class="label">VaR (95%)</div>
+                <div class="value">{var_95:.2%}</div>
+            </div>
+            <div class="metric-card bad">
+                <div class="label">VaR (99%)</div>
+                <div class="value">{var_99:.2%}</div>
+            </div>
+            <div class="metric-card bad">
+                <div class="label">CVaR (95%)</div>
+                <div class="value">{cvar_95:.2%}</div>
+            </div>
+            <div class="metric-card bad">
+                <div class="label">CVaR (99%)</div>
+                <div class="value">{cvar_99:.2%}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Skewness</div>
+                <div class="value">{skew:.2f}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Kurtosis</div>
+                <div class="value">{kurt:.2f}</div>
+            </div>
+        </div>
+    </div>
+"""
+        return summary_html
+    
+    def _generate_drawdown_analysis(
+        self,
+        strategy_results: Dict,
+        combined_equity: pd.DataFrame
+    ) -> str:
+        """Generate drawdown analysis with underwater chart."""
+        # Calculate drawdowns for combined portfolio
+        cumulative = combined_equity['TotalValue'] / combined_equity['TotalValue'].iloc[0]
+        peak = cumulative.cummax()
+        drawdown = (cumulative - peak) / peak
+        
+        # Create underwater chart
+        fig = make_subplots(
+            rows=2, cols=1,
+            row_heights=[0.6, 0.4],
+            subplot_titles=('Portfolio Equity with Peaks', 'Underwater Drawdown Chart'),
+            vertical_spacing=0.12
         )
         
-        html_content = fig.to_html(include_plotlyjs='cdn', full_html=True)
+        # Equity curve with running maximum
+        fig.add_trace(
+            go.Scatter(x=combined_equity.index, y=combined_equity['TotalValue'],
+                      name='Equity', line=dict(color='rgb(31, 119, 180)', width=2)),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=combined_equity.index, y=peak * combined_equity['TotalValue'].iloc[0],
+                      name='Peak', line=dict(color='rgba(255, 65, 54, 0.5)', dash='dash')),
+            row=1, col=1
+        )
         
-        if save_path:
-            with open(save_path, 'w') as f:
-                f.write(html_content)
+        # Drawdown
+        fig.add_trace(
+            go.Scatter(x=combined_equity.index, y=drawdown * 100,
+                      name='Drawdown', fill='tozeroy',
+                      line=dict(color='rgb(220, 53, 69)', width=2),
+                      fillcolor='rgba(220, 53, 69, 0.3)'),
+            row=2, col=1
+        )
         
-        return html_content
+        fig.update_xaxes(title_text='Date', row=2, col=1)
+        fig.update_yaxes(title_text='Equity ($)', row=1, col=1)
+        fig.update_yaxes(title_text='Drawdown (%)', row=2, col=1)
+        
+        fig.update_layout(height=700, template='plotly_white', showlegend=True)
+        
+        # Calculate drawdown statistics
+        max_dd = drawdown.min()
+        max_dd_date = drawdown.idxmin()
+        
+        # Find drawdown periods
+        in_drawdown = drawdown < 0
+        drawdown_periods = []
+        start = None
+        
+        for i, (date, val) in enumerate(zip(drawdown.index, in_drawdown)):
+            if val and start is None:
+                start = date
+            elif not val and start is not None:
+                drawdown_periods.append((start, drawdown.index[i-1]))
+                start = None
+        
+        if start is not None:
+            drawdown_periods.append((start, drawdown.index[-1]))
+        
+        avg_dd_duration = np.mean([(end - start).days for start, end in drawdown_periods]) if drawdown_periods else 0
+        
+        dd_html = f"""
+    <div class="section">
+        <h2 class="section-title">Drawdown Analysis</h2>
+        
+        <div class="metric-grid">
+            <div class="metric-card bad">
+                <div class="label">Maximum Drawdown</div>
+                <div class="value">{max_dd:.2%}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Max DD Date</div>
+                <div class="value">{max_dd_date.strftime('%Y-%m-%d')}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Drawdown Periods</div>
+                <div class="value">{len(drawdown_periods)}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Avg DD Duration</div>
+                <div class="value">{avg_dd_duration:.0f} days</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div id="drawdown-chart"></div>
+        </div>
+    </div>
+    <script>
+        var ddData = {fig.to_json()};
+        Plotly.newPlot('drawdown-chart', ddData.data, ddData.layout, {{responsive: true}});
+    </script>
+"""
+        return dd_html
+    
+    def _generate_correlation_matrix(
+        self,
+        strategy_results: Dict,
+        benchmark_data: Optional[pd.DataFrame],
+        benchmark_name: str
+    ) -> str:
+        """Generate correlation matrix heatmap."""
+        # Build returns DataFrame
+        returns_dict = {}
+        
+        for strategy_name, data in strategy_results.items():
+            equity = data['result'].equity_curve['TotalValue']
+            returns_dict[strategy_name] = equity.pct_change()
+        
+        if benchmark_data is not None:
+            returns_dict[benchmark_name] = benchmark_data['TotalValue'].pct_change()
+        
+        returns_df = pd.DataFrame(returns_dict).dropna()
+        
+        # Calculate correlation matrix
+        corr_matrix = returns_df.corr()
+        
+        # Create heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.columns,
+            colorscale='RdBu',
+            zmid=0,
+            text=corr_matrix.values,
+            texttemplate='%{text:.2f}',
+            textfont={"size": 12},
+            colorbar=dict(title="Correlation")
+        ))
+        
+        fig.update_layout(
+            title='Strategy Correlation Matrix',
+            height=500,
+            template='plotly_white'
+        )
+        
+        # Diversification analysis
+        avg_corr = corr_matrix.values[np.triu_indices_from(corr_matrix.values, k=1)].mean()
+        diversification_level = "Excellent" if avg_corr < 0.3 else "Good" if avg_corr < 0.6 else "Moderate" if avg_corr < 0.8 else "Poor"
+        
+        corr_html = f"""
+    <div class="section">
+        <h2 class="section-title">Correlation & Diversification Analysis</h2>
+        
+        <div class="alert alert-{'success' if diversification_level in ['Excellent', 'Good'] else 'warning'}">
+            <strong>Diversification Level: {diversification_level}</strong> - Average correlation of {avg_corr:.2f}
+        </div>
+        
+        <div class="chart-container">
+            <div id="correlation-chart"></div>
+        </div>
+        
+        <p style="margin-top: 20px; color: #666;">
+            <strong>Interpretation:</strong> Lower correlation (closer to 0 or negative) indicates better diversification. 
+            Strategies with correlation < 0.5 provide meaningful diversification benefits.
+        </p>
+    </div>
+    <script>
+        var corrData = {fig.to_json()};
+        Plotly.newPlot('correlation-chart', corrData.data, corrData.layout, {{responsive: true}});
+    </script>
+"""
+        return corr_html
+    
+    def _generate_rolling_risk_metrics(
+        self,
+        combined_equity: pd.DataFrame,
+        benchmark_data: Optional[pd.DataFrame],
+        benchmark_name: str
+    ) -> str:
+        """Generate rolling risk metrics charts."""
+        returns = combined_equity['TotalValue'].pct_change().dropna()
+        
+        # Rolling volatility (30, 60, 90 day)
+        rolling_vol_30 = returns.rolling(30).std() * np.sqrt(252)
+        rolling_vol_60 = returns.rolling(60).std() * np.sqrt(252)
+        rolling_vol_90 = returns.rolling(90).std() * np.sqrt(252)
+        
+        # Rolling Sharpe (90 day)
+        rolling_sharpe = (returns.rolling(90).mean() / returns.rolling(90).std()) * np.sqrt(252)
+        
+        # Create subplots
+        fig = make_subplots(
+            rows=2, cols=1,
+            subplot_titles=('Rolling Volatility (Annualized)', 'Rolling Sharpe Ratio (90-Day)'),
+            vertical_spacing=0.15,
+            row_heights=[0.5, 0.5]
+        )
+        
+        # Rolling volatility
+        fig.add_trace(
+            go.Scatter(x=rolling_vol_30.index, y=rolling_vol_30 * 100,
+                      name='30-Day', line=dict(width=1.5)),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=rolling_vol_60.index, y=rolling_vol_60 * 100,
+                      name='60-Day', line=dict(width=1.5)),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=rolling_vol_90.index, y=rolling_vol_90 * 100,
+                      name='90-Day', line=dict(width=2)),
+            row=1, col=1
+        )
+        
+        # Rolling Sharpe
+        fig.add_trace(
+            go.Scatter(x=rolling_sharpe.index, y=rolling_sharpe,
+                      name='Sharpe 90D', line=dict(color='rgb(102, 126, 234)', width=2),
+                      fill='tozeroy', fillcolor='rgba(102, 126, 234, 0.2)'),
+            row=2, col=1
+        )
+        fig.add_hline(y=0, line_dash="dash", line_color="red", row=2, col=1)
+        
+        fig.update_xaxes(title_text='Date', row=2, col=1)
+        fig.update_yaxes(title_text='Volatility (%)', row=1, col=1)
+        fig.update_yaxes(title_text='Sharpe Ratio', row=2, col=1)
+        
+        fig.update_layout(height=700, template='plotly_white', showlegend=True)
+        
+        rolling_html = f"""
+    <div class="section">
+        <h2 class="section-title">Rolling Risk Metrics</h2>
+        <div class="chart-container">
+            <div id="rolling-risk-chart"></div>
+        </div>
+    </div>
+    <script>
+        var rollingData = {fig.to_json()};
+        Plotly.newPlot('rolling-risk-chart', rollingData.data, rollingData.layout, {{responsive: true}});
+    </script>
+"""
+        return rolling_html
+    
+    def _generate_var_analysis(
+        self,
+        strategy_results: Dict,
+        combined_equity: pd.DataFrame
+    ) -> str:
+        """Generate VaR and CVaR analysis."""
+        returns = combined_equity['TotalValue'].pct_change().dropna()
+        
+        # Calculate VaR at different confidence levels
+        confidence_levels = [90, 95, 99]
+        var_results = []
+        
+        for conf in confidence_levels:
+            var = np.percentile(returns, 100 - conf)
+            cvar = returns[returns <= var].mean()
+            var_results.append({
+                'Confidence': f'{conf}%',
+                'VaR (Daily)': f'{var:.2%}',
+                'CVaR (Daily)': f'{cvar:.2%}',
+                'VaR (Portfolio)': f'${combined_equity["TotalValue"].iloc[-1] * var:,.2f}',
+                'CVaR (Portfolio)': f'${combined_equity["TotalValue"].iloc[-1] * cvar:,.2f}'
+            })
+        
+        # Create table HTML
+        table_rows = '\n'.join([
+            f"""
+            <tr>
+                <td>{r['Confidence']}</td>
+                <td>{r['VaR (Daily)']}</td>
+                <td>{r['CVaR (Daily)']}</td>
+                <td>{r['VaR (Portfolio)']}</td>
+                <td>{r['CVaR (Portfolio)']}</td>
+            </tr>
+            """ for r in var_results
+        ])
+        
+        # Returns distribution with VaR lines
+        fig = go.Figure()
+        
+        fig.add_trace(go.Histogram(
+            x=returns * 100,
+            nbinsx=100,
+            name='Returns Distribution',
+            marker_color='rgb(102, 126, 234)',
+            opacity=0.7
+        ))
+        
+        # Add VaR lines
+        for conf in confidence_levels:
+            var = np.percentile(returns, 100 - conf)
+            fig.add_vline(x=var * 100, line_dash="dash", 
+                         annotation_text=f'VaR {conf}%',
+                         line_color='red' if conf == 99 else 'orange')
+        
+        fig.update_layout(
+            title='Returns Distribution with VaR Levels',
+            xaxis_title='Daily Return (%)',
+            yaxis_title='Frequency',
+            height=400,
+            template='plotly_white'
+        )
+        
+        var_html = f"""
+    <div class="section">
+        <h2 class="section-title">Value at Risk (VaR) & Conditional VaR Analysis</h2>
+        
+        <p style="color: #666; margin-bottom: 20px;">
+            <strong>VaR</strong> estimates the maximum loss at a given confidence level. 
+            <strong>CVaR</strong> (Expected Shortfall) is the average loss when VaR is exceeded.
+        </p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Confidence Level</th>
+                    <th>VaR (Daily %)</th>
+                    <th>CVaR (Daily %)</th>
+                    <th>VaR ($)</th>
+                    <th>CVaR ($)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+        
+        <div class="chart-container">
+            <div id="var-chart"></div>
+        </div>
+    </div>
+    <script>
+        var varData = {fig.to_json()};
+        Plotly.newPlot('var-chart', varData.data, varData.layout, {{responsive: true}});
+    </script>
+"""
+        return var_html
+    
+    def _generate_strategy_risk_profiles(self, strategy_results: Dict) -> str:
+        """Generate individual strategy risk profiles."""
+        sections = ['<div class="section"><h2 class="section-title">Individual Strategy Risk Profiles</h2>']
+        
+        for strategy_name, data in strategy_results.items():
+            result = data['result']
+            equity = result.equity_curve['TotalValue']
+            returns = equity.pct_change().dropna()
+            
+            # Risk metrics
+            annual_vol = returns.std() * np.sqrt(252)
+            sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+            
+            downside_returns = returns[returns < 0]
+            sortino = (returns.mean() / downside_returns.std() * np.sqrt(252)) if len(downside_returns) > 0 and downside_returns.std() > 0 else 0
+            
+            var_95 = np.percentile(returns, 5)
+            cvar_95 = returns[returns <= var_95].mean()
+            
+            cumulative = equity / equity.iloc[0]
+            peak = cumulative.cummax()
+            drawdown = (cumulative - peak) / peak
+            max_dd = drawdown.min()
+            
+            risk_level = "Low" if annual_vol < 0.15 else "Medium" if annual_vol < 0.25 else "High"
+            
+            sections.append(f"""
+        <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 15px 0;">
+            <h3 style="color: #f5576c; margin-bottom: 15px;">{strategy_name}</h3>
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="label">Risk Level</div>
+                    <div class="value">{risk_level}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Annual Volatility</div>
+                    <div class="value">{annual_vol:.2%}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Sharpe Ratio</div>
+                    <div class="value">{sharpe:.2f}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Sortino Ratio</div>
+                    <div class="value">{sortino:.2f}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Max Drawdown</div>
+                    <div class="value">{max_dd:.2%}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">VaR (95%)</div>
+                    <div class="value">{var_95:.2%}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">CVaR (95%)</div>
+                    <div class="value">{cvar_95:.2%}</div>
+                </div>
+            </div>
+        </div>
+""")
+        
+        sections.append('</div>')
+        return '\n'.join(sections)
+    
+    def _generate_footer(self) -> str:
+        """Generate HTML footer."""
+        return """
+    <div class="footer">
+        <p>⚠️ Risk Dashboard - QuantTrading</p>
+        <p>© 2025 | Comprehensive Risk Analysis & Monitoring</p>
+    </div>
+</div>
+</body>
+</html>
+"""
