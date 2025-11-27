@@ -38,4 +38,4 @@ Thumbs.db
 .pytest_cache/
 
 # Personal notes
-claude_read.md
+claude_read.mdreports/*.html
