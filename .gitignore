@@ -3,6 +3,8 @@ Dataset/
 
 # Python cache
 __pycache__/
+*/__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -38,4 +40,9 @@ Thumbs.db
 .pytest_cache/
 
 # Personal notes
-claude_read.mdreports/*.html
+claude_read.md
+
+# Reports (generated HTML files)
+reports/*.html
+reports/**/*.html
+*.html
