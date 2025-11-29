@@ -112,6 +112,9 @@ class MultiStrategyReporter:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>{title}</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -329,14 +332,19 @@ class MultiStrategyReporter:
         benchmark_name: str
     ) -> str:
         """Generate main equity curve chart with all strategies + composite + benchmark."""
+        print(f"🔍 DEBUG _generate_main_chart called with {len(strategy_results)} strategies")
+        for name, data in strategy_results.items():
+            eq = data['result'].equity_curve
+            print(f"  {name}: {eq['TotalValue'].iloc[0]:.2f} → {eq['TotalValue'].iloc[-1]:.2f}")
+        
         fig = go.Figure()
         
         # Individual strategies (dashed lines)
         for strategy_name, data in strategy_results.items():
             equity = data['result'].equity_curve
             fig.add_trace(go.Scatter(
-                x=equity.index,
-                y=equity['TotalValue'],
+                x=equity.index.tolist(),  # Convert DatetimeIndex to list
+                y=equity['TotalValue'].tolist(),  # Convert Series to list
                 name=strategy_name,
                 mode='lines',
                 line=dict(width=2, dash='dash'),
@@ -345,8 +353,8 @@ class MultiStrategyReporter:
         
         # Combined portfolio (solid line, thicker)
         fig.add_trace(go.Scatter(
-            x=combined_equity.index,
-            y=combined_equity['TotalValue'],
+            x=combined_equity.index.tolist(),
+            y=combined_equity['TotalValue'].tolist(),
             name='Combined Portfolio',
             mode='lines',
             line=dict(color='rgb(31, 119, 180)', width=3),
@@ -356,8 +364,8 @@ class MultiStrategyReporter:
         # Benchmark (if provided)
         if benchmark_data is not None:
             fig.add_trace(go.Scatter(
-                x=benchmark_data.index,
-                y=benchmark_data['TotalValue'],
+                x=benchmark_data.index.tolist(),
+                y=benchmark_data['TotalValue'].tolist(),
                 name=benchmark_name,
                 mode='lines',
                 line=dict(color='rgb(255, 65, 54)', width=3),
@@ -380,16 +388,26 @@ class MultiStrategyReporter:
             )
         )
         
+        # DEBUG: Check what's in the figure before serialization
+        print(f"🔍 DEBUG Figure has {len(fig.data)} traces:")
+        for i, trace in enumerate(fig.data):
+            y_vals = trace.y
+            print(f"  Trace {i} ({trace.name}): y[0]={y_vals[0]:.2f}, y[-1]={y_vals[-1]:.2f}, len={len(y_vals)}")
+        
+        # Add timestamp for cache busting
+        import time
+        chart_id = f"main-equity-chart-{int(time.time())}"
+        
         chart_html = f"""
     <div class="section">
         <h2 class="section-title">Portfolio Performance</h2>
         <div class="chart-container">
-            <div id="main-equity-chart"></div>
+            <div id="{chart_id}"></div>
         </div>
     </div>
     <script>
         var mainData = {fig.to_json()};
-        Plotly.newPlot('main-equity-chart', mainData.data, mainData.layout, {{responsive: true}});
+        Plotly.newPlot('{chart_id}', mainData.data, mainData.layout, {{responsive: true}});
     </script>
 """
         return chart_html
@@ -526,8 +544,8 @@ class MultiStrategyReporter:
             
             fig_beta = go.Figure()
             fig_beta.add_trace(go.Scatter(
-                x=rolling_beta.index,
-                y=rolling_beta.values,
+                x=rolling_beta.index.tolist(),
+                y=rolling_beta.values.tolist(),
                 name='90-Day Rolling Beta',
                 mode='lines',
                 line=dict(color='rgb(102, 126, 234)', width=2),
@@ -564,15 +582,15 @@ class MultiStrategyReporter:
         
         fig_base100 = go.Figure()
         fig_base100.add_trace(go.Scatter(
-            x=combined_equity.index,
-            y=portfolio_base100,
+            x=combined_equity.index.tolist(),
+            y=portfolio_base100.tolist(),
             name='Portfolio',
             mode='lines',
             line=dict(color='rgb(31, 119, 180)', width=3)
         ))
         fig_base100.add_trace(go.Scatter(
-            x=benchmark_data.index,
-            y=benchmark_base100,
+            x=benchmark_data.index.tolist(),
+            y=benchmark_base100.tolist(),
             name=benchmark_name,
             mode='lines',
             line=dict(color='rgb(255, 65, 54)', width=3)
@@ -754,7 +772,7 @@ class MultiStrategyReporter:
         # PnL distribution chart
         fig = go.Figure()
         fig.add_trace(go.Histogram(
-            x=combined_trades['pnl'],
+            x=combined_trades['pnl'].tolist(),
             nbinsx=50,
             name='Trade PnL',
             marker_color='rgb(102, 126, 234)'

@@ -106,6 +106,9 @@ class RiskDashboard:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>{title}</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -384,19 +387,19 @@ class RiskDashboard:
         
         # Equity curve with running maximum
         fig.add_trace(
-            go.Scatter(x=combined_equity.index, y=combined_equity['TotalValue'],
+            go.Scatter(x=combined_equity.index.tolist(), y=combined_equity['TotalValue'].tolist(),
                       name='Equity', line=dict(color='rgb(31, 119, 180)', width=2)),
             row=1, col=1
         )
         fig.add_trace(
-            go.Scatter(x=combined_equity.index, y=peak * combined_equity['TotalValue'].iloc[0],
+            go.Scatter(x=combined_equity.index.tolist(), y=(peak * combined_equity['TotalValue'].iloc[0]).tolist(),
                       name='Peak', line=dict(color='rgba(255, 65, 54, 0.5)', dash='dash')),
             row=1, col=1
         )
         
         # Drawdown
         fig.add_trace(
-            go.Scatter(x=combined_equity.index, y=drawdown * 100,
+            go.Scatter(x=combined_equity.index.tolist(), y=(drawdown * 100).tolist(),
                       name='Drawdown', fill='tozeroy',
                       line=dict(color='rgb(220, 53, 69)', width=2),
                       fillcolor='rgba(220, 53, 69, 0.3)'),
@@ -454,12 +457,12 @@ class RiskDashboard:
         </div>
         
         <div class="chart-container">
-            <div id="drawdown-chart"></div>
+            <div id="drawdown-chart-{int(__import__('time').time())}"></div>
         </div>
     </div>
     <script>
         var ddData = {fig.to_json()};
-        Plotly.newPlot('drawdown-chart', ddData.data, ddData.layout, {{responsive: true}});
+        Plotly.newPlot('drawdown-chart-{int(__import__('time').time())}', ddData.data, ddData.layout, {{responsive: true}});
     </script>
 """
         return dd_html
@@ -488,12 +491,12 @@ class RiskDashboard:
         
         # Create heatmap
         fig = go.Figure(data=go.Heatmap(
-            z=corr_matrix.values,
-            x=corr_matrix.columns,
-            y=corr_matrix.columns,
+            z=corr_matrix.values.tolist(),
+            x=corr_matrix.columns.tolist(),
+            y=corr_matrix.columns.tolist(),
             colorscale='RdBu',
             zmid=0,
-            text=corr_matrix.values,
+            text=corr_matrix.values.tolist(),
             texttemplate='%{text:.2f}',
             textfont={"size": 12},
             colorbar=dict(title="Correlation")
@@ -560,24 +563,24 @@ class RiskDashboard:
         
         # Rolling volatility
         fig.add_trace(
-            go.Scatter(x=rolling_vol_30.index, y=rolling_vol_30 * 100,
+            go.Scatter(x=rolling_vol_30.index.tolist(), y=(rolling_vol_30 * 100).tolist(),
                       name='30-Day', line=dict(width=1.5)),
             row=1, col=1
         )
         fig.add_trace(
-            go.Scatter(x=rolling_vol_60.index, y=rolling_vol_60 * 100,
+            go.Scatter(x=rolling_vol_60.index.tolist(), y=(rolling_vol_60 * 100).tolist(),
                       name='60-Day', line=dict(width=1.5)),
             row=1, col=1
         )
         fig.add_trace(
-            go.Scatter(x=rolling_vol_90.index, y=rolling_vol_90 * 100,
+            go.Scatter(x=rolling_vol_90.index.tolist(), y=(rolling_vol_90 * 100).tolist(),
                       name='90-Day', line=dict(width=2)),
             row=1, col=1
         )
         
         # Rolling Sharpe
         fig.add_trace(
-            go.Scatter(x=rolling_sharpe.index, y=rolling_sharpe,
+            go.Scatter(x=rolling_sharpe.index.tolist(), y=rolling_sharpe.tolist(),
                       name='Sharpe 90D', line=dict(color='rgb(102, 126, 234)', width=2),
                       fill='tozeroy', fillcolor='rgba(102, 126, 234, 0.2)'),
             row=2, col=1
@@ -594,12 +597,12 @@ class RiskDashboard:
     <div class="section">
         <h2 class="section-title">Rolling Risk Metrics</h2>
         <div class="chart-container">
-            <div id="rolling-risk-chart"></div>
+            <div id="rolling-risk-chart-{int(__import__('time').time())}"></div>
         </div>
     </div>
     <script>
         var rollingData = {fig.to_json()};
-        Plotly.newPlot('rolling-risk-chart', rollingData.data, rollingData.layout, {{responsive: true}});
+        Plotly.newPlot('rolling-risk-chart-{int(__import__('time').time())}', rollingData.data, rollingData.layout, {{responsive: true}});
     </script>
 """
         return rolling_html
@@ -644,7 +647,7 @@ class RiskDashboard:
         fig = go.Figure()
         
         fig.add_trace(go.Histogram(
-            x=returns * 100,
+            x=(returns * 100).tolist(),
             nbinsx=100,
             name='Returns Distribution',
             marker_color='rgb(102, 126, 234)',
@@ -691,12 +694,12 @@ class RiskDashboard:
         </table>
         
         <div class="chart-container">
-            <div id="var-chart"></div>
+            <div id="var-chart-{int(__import__('time').time())}"></div>
         </div>
     </div>
     <script>
         var varData = {fig.to_json()};
-        Plotly.newPlot('var-chart', varData.data, varData.layout, {{responsive: true}});
+        Plotly.newPlot('var-chart-{int(__import__('time').time())}', varData.data, varData.layout, {{responsive: true}});
     </script>
 """
         return var_html
