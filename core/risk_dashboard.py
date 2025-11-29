@@ -33,9 +33,16 @@ class RiskDashboard:
     - VaR/CVaR calculations
     """
     
-    def __init__(self):
-        """Initialize risk dashboard."""
-        pass
+    def __init__(self, output_dir: str = 'reports/risk'):
+        """
+        Initialize risk dashboard.
+        
+        Args:
+            output_dir: Directory to save risk dashboard HTML files
+        """
+        self.output_dir = output_dir
+        import os
+        os.makedirs(output_dir, exist_ok=True)
     
     def generate_dashboard(
         self,
@@ -97,6 +104,102 @@ class RiskDashboard:
         html_sections.append(self._generate_footer())
         
         return '\n'.join(html_sections)
+    
+    def generate_multi_strategy_risk_dashboard(
+        self,
+        results: Dict,
+        capital_allocation: Dict[str, float],
+        total_capital: float,
+        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_name: str = "Benchmark",
+        save_path: Optional[str] = None,
+        auto_open: bool = True
+    ) -> str:
+        """
+        Generate comprehensive risk dashboard for multi-strategy portfolio.
+        
+        This method formats the results dictionary from a multi-strategy backtest
+        into the format expected by generate_dashboard() and creates an aggregated
+        portfolio equity curve.
+        
+        Args:
+            results: Dict of {strategy_name: BacktestResult}
+            capital_allocation: Dict of {strategy_name: allocation_percentage}
+            total_capital: Total portfolio capital
+            benchmark_data: Optional benchmark equity DataFrame
+            benchmark_name: Name of benchmark
+            save_path: Optional path to save HTML file. If None, uses output_dir with timestamp
+            auto_open: If True, automatically open the dashboard in default browser
+            
+        Returns:
+            Path to generated HTML file
+        """
+        import os
+        import webbrowser
+        from datetime import datetime
+        
+        # Format strategy results for generate_dashboard()
+        strategy_results_formatted = {}
+        for strategy_name, result in results.items():
+            allocation_pct = capital_allocation.get(strategy_name, 0)
+            strategy_capital = total_capital * allocation_pct
+            strategy_results_formatted[strategy_name] = {
+                'result': result,
+                'capital': strategy_capital
+            }
+        
+        # Create combined equity curve (aggregate all strategies)
+        combined_equity = None
+        for strategy_name, result in results.items():
+            if len(result.equity_curve) > 0:
+                if combined_equity is None:
+                    combined_equity = result.equity_curve[['TotalValue']].copy()
+                    combined_equity.columns = [strategy_name]
+                else:
+                    # Align on date index and add
+                    strategy_equity = result.equity_curve[['TotalValue']].copy()
+                    strategy_equity.columns = [strategy_name]
+                    combined_equity = combined_equity.join(strategy_equity, how='outer')
+        
+        # Sum across strategies to get total portfolio value
+        if combined_equity is not None:
+            combined_equity = combined_equity.fillna(method='ffill').fillna(0)
+            combined_equity['TotalValue'] = combined_equity.sum(axis=1)
+            combined_equity = combined_equity[['TotalValue']]
+        else:
+            # Empty portfolio
+            combined_equity = pd.DataFrame({'TotalValue': [total_capital]})
+        
+        # Generate dashboard HTML
+        dashboard_html = self.generate_dashboard(
+            strategy_results=strategy_results_formatted,
+            combined_equity=combined_equity,
+            benchmark_data=benchmark_data,
+            benchmark_name=benchmark_name,
+            title=f"Multi-Strategy Portfolio Risk Dashboard (${total_capital:,.0f})"
+        )
+        
+        # Determine save path
+        if save_path is None:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            save_path = os.path.join(self.output_dir, f'risk_dashboard_{timestamp}.html')
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+        
+        # Write HTML file
+        with open(save_path, 'w', encoding='utf-8') as f:
+            f.write(dashboard_html)
+        
+        print(f"✅ Risk dashboard saved to: {save_path}")
+        
+        # Auto-open in browser
+        if auto_open:
+            abs_path = os.path.abspath(save_path)
+            webbrowser.open(f'file://{abs_path}')
+            print(f"🌐 Opening dashboard in browser...")
+        
+        return save_path
     
     def _generate_header(self, title: str) -> str:
         """Generate HTML header."""
@@ -528,10 +631,89 @@ class RiskDashboard:
             <strong>Interpretation:</strong> Lower correlation (closer to 0 or negative) indicates better diversification. 
             Strategies with correlation < 0.5 provide meaningful diversification benefits.
         </p>
+"""
+        
+        # Add covariance matrix
+        cov_matrix = returns_df.cov() * 252  # Annualize
+        
+        fig_cov = go.Figure(data=go.Heatmap(
+            z=cov_matrix.values.tolist(),
+            x=cov_matrix.columns.tolist(),
+            y=cov_matrix.columns.tolist(),
+            colorscale='Viridis',
+            text=cov_matrix.values.tolist(),
+            texttemplate='%{text:.4f}',
+            textfont={"size": 10},
+            colorbar=dict(title="Covariance")
+        ))
+        
+        fig_cov.update_layout(
+            title='Strategy Covariance Matrix (Annualized)',
+            height=500,
+            template='plotly_white'
+        )
+        
+        corr_html += f"""
+        <h3 style="margin-top: 30px;">Covariance Matrix</h3>
+        <div class="chart-container">
+            <div id="covariance-chart-{int(__import__('time').time())}"></div>
+        </div>
+        <p style="margin-top: 10px; color: #666;">
+            <strong>Interpretation:</strong> Covariance measures how strategies move together. Higher values indicate greater joint variability.
+        </p>
+"""
+        
+        # Add beta calculations if benchmark is present
+        if benchmark_name in returns_df.columns:
+            corr_html += """
+        <h3 style="margin-top: 30px;">Beta vs Benchmark</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy</th>
+                    <th>Beta</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+            
+            benchmark_returns = returns_df[benchmark_name]
+            benchmark_var = benchmark_returns.var()
+            
+            for col in returns_df.columns:
+                if col != benchmark_name:
+                    cov = returns_df[col].cov(benchmark_returns)
+                    beta = cov / benchmark_var if benchmark_var > 0 else 0
+                    interpretation = "More volatile" if beta > 1 else "Less volatile" if beta < 1 else "Same volatility"
+                    color = "#f39c12" if beta > 1 else "#27ae60"
+                    
+                    corr_html += f"""
+                <tr>
+                    <td><strong>{col}</strong></td>
+                    <td style="color: {color};">{beta:.2f}</td>
+                    <td>{interpretation} than {benchmark_name}</td>
+                </tr>
+"""
+            
+            corr_html += """
+            </tbody>
+        </table>
+        <p style="margin-top: 10px; color: #666;">
+            <strong>Beta > 1:</strong> Strategy is more volatile than benchmark<br>
+            <strong>Beta < 1:</strong> Strategy is less volatile than benchmark<br>
+            <strong>Beta = 1:</strong> Strategy moves in line with benchmark
+        </p>
+"""
+        
+        corr_html += """
     </div>
     <script>
         var corrData = {fig.to_json()};
         Plotly.newPlot('correlation-chart', corrData.data, corrData.layout, {{responsive: true}});
+        
+        var covData = {fig_cov.to_json()};
+        Plotly.newPlot('covariance-chart-{int(__import__('time').time())}', covData.data, covData.layout, {{responsive: true}});
     </script>
 """
         return corr_html

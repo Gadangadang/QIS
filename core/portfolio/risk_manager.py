@@ -5,10 +5,12 @@ Responsibilities:
 - Calculate position sizes based on risk parameters
 - Check risk limits (stops, concentration)
 - Monitor portfolio-level risk
+- Kill switches and circuit breakers for catastrophic losses
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
+from datetime import date, datetime
 import numpy as np
 import pandas as pd
 
@@ -23,6 +25,12 @@ class RiskConfig:
     take_profit_pct: Optional[float] = None  # Take profit percentage
     max_correlation_exposure: float = 0.50  # Max 50% in correlated assets
     min_trade_value: float = 100.0  # Minimum trade size
+    
+    # Kill switches and circuit breakers
+    max_drawdown_pct: float = 0.15  # Max 15% drawdown kill switch
+    max_daily_loss_pct: float = 0.03  # Max 3% daily loss kill switch
+    max_portfolio_heat_pct: float = 0.10  # Max 10% total portfolio at risk
+    min_capital_pct: float = 0.50  # Kill switch if capital falls below 50% of peak
     
 
 class RiskManager:
@@ -51,6 +59,19 @@ class RiskManager:
             config: RiskConfig object with risk parameters
         """
         self.config = config
+        
+        # Kill switch state
+        self.is_killed = False
+        self.kill_reason = None
+        
+        # Capital tracking for kill switches
+        self.initial_capital = None
+        self.peak_capital = None
+        self.daily_start_capital = None
+        self.last_reset_date = None
+        
+        # Breach tracking
+        self.breach_history: List[Dict] = []
     
     def calculate_position_size(
         self, 
@@ -232,3 +253,244 @@ class RiskManager:
         
         # Return half-Kelly for safety (common practice)
         return max(0, kelly * 0.5)
+    
+    # =========================================================================
+    # KILL SWITCHES AND CIRCUIT BREAKERS
+    # =========================================================================
+    
+    def initialize_capital_tracking(self, initial_capital: float, current_date: date = None):
+        """Initialize capital tracking for kill switches."""
+        self.initial_capital = initial_capital
+        self.peak_capital = initial_capital
+        self.daily_start_capital = initial_capital
+        self.last_reset_date = current_date or date.today()
+    
+    def update_capital(self, current_capital: float, current_date: date = None):
+        """
+        Update capital tracking and check kill switches.
+        
+        Args:
+            current_capital: Current total portfolio value
+            current_date: Date for daily tracking
+            
+        Returns:
+            Dict with breach information
+        """
+        if current_date is None:
+            current_date = date.today()
+        
+        if self.initial_capital is None:
+            self.initialize_capital_tracking(current_capital, current_date)
+            return {'breaches': [], 'is_killed': False}
+        
+        # Update peak
+        if current_capital > self.peak_capital:
+            self.peak_capital = current_capital
+        
+        # Reset daily tracking if new day
+        if current_date != self.last_reset_date:
+            self.daily_start_capital = current_capital
+            self.last_reset_date = current_date
+        
+        breaches = []
+        
+        # Check kill switches
+        current_dd = self.get_current_drawdown(current_capital)
+        if current_dd >= self.config.max_drawdown_pct:
+            self._trigger_kill_switch(
+                f"Max drawdown {current_dd:.1%} reached (limit: {self.config.max_drawdown_pct:.1%})"
+            )
+            breaches.append({
+                'type': 'KILL_SWITCH',
+                'rule': 'max_drawdown',
+                'value': current_dd,
+                'limit': self.config.max_drawdown_pct,
+                'timestamp': datetime.now()
+            })
+        
+        daily_pnl = self.get_daily_pnl_pct(current_capital)
+        if daily_pnl <= -self.config.max_daily_loss_pct:
+            self._trigger_kill_switch(
+                f"Daily loss {daily_pnl:.1%} reached (limit: {-self.config.max_daily_loss_pct:.1%})"
+            )
+            breaches.append({
+                'type': 'KILL_SWITCH',
+                'rule': 'max_daily_loss',
+                'value': daily_pnl,
+                'limit': -self.config.max_daily_loss_pct,
+                'timestamp': datetime.now()
+            })
+        
+        capital_pct = current_capital / self.initial_capital
+        if capital_pct < self.config.min_capital_pct:
+            self._trigger_kill_switch(
+                f"Capital {capital_pct:.1%} of initial, below minimum {self.config.min_capital_pct:.1%}"
+            )
+            breaches.append({
+                'type': 'KILL_SWITCH',
+                'rule': 'min_capital',
+                'value': capital_pct,
+                'limit': self.config.min_capital_pct,
+                'timestamp': datetime.now()
+            })
+        
+        if breaches:
+            self.breach_history.extend(breaches)
+        
+        return {
+            'breaches': breaches,
+            'is_killed': self.is_killed,
+            'kill_reason': self.kill_reason,
+            'stats': {
+                'drawdown': current_dd,
+                'daily_pnl_pct': daily_pnl,
+                'capital_pct': capital_pct
+            }
+        }
+    
+    def check_trade_approval(
+        self,
+        asset: str,
+        size: float,
+        price: float,
+        current_positions: Optional[Dict] = None,
+        portfolio_value: float = None
+    ) -> Tuple[bool, List[str]]:
+        """
+        Check if trade passes all risk limits BEFORE execution.
+        
+        Args:
+            asset: Asset ticker
+            size: Position size
+            price: Current price
+            current_positions: Dict of current positions
+            portfolio_value: Current portfolio value
+            
+        Returns:
+            (approved, reasons) - True if approved, list of blocking reasons if not
+        """
+        if self.is_killed:
+            return False, [f"KILL SWITCH ACTIVE: {self.kill_reason}"]
+        
+        if portfolio_value is None or portfolio_value <= 0:
+            return False, ["Portfolio value not set or invalid"]
+        
+        reasons = []
+        
+        # Check position size limit
+        notional = abs(size * price)
+        position_pct = notional / portfolio_value
+        
+        if position_pct > self.config.max_position_size:
+            reasons.append(
+                f"Position size {position_pct:.1%} exceeds limit {self.config.max_position_size:.1%}"
+            )
+        
+        # Check if adding to losing position
+        if current_positions and asset in current_positions:
+            pos = current_positions[asset]
+            if 'pnl_pct' in pos and pos['pnl_pct'] < -0.05:  # -5% loss
+                reasons.append(
+                    f"Position {asset} already down {pos['pnl_pct']:.1%}"
+                )
+        
+        return len(reasons) == 0, reasons
+    
+    def check_portfolio_heat(self, positions: Dict[str, Dict], portfolio_value: float) -> Dict:
+        """
+        Check portfolio heat (total at-risk capital).
+        
+        Args:
+            positions: Dict of {asset: {pnl, pnl_pct, ...}}
+            portfolio_value: Current portfolio value
+            
+        Returns:
+            Dict with heat metrics and breaches
+        """
+        if portfolio_value <= 0:
+            return {'heat': 0.0, 'breaches': []}
+        
+        # Sum unrealized losses
+        at_risk = sum(abs(pos.get('pnl', 0)) for pos in positions.values() 
+                     if pos.get('pnl', 0) < 0)
+        heat = at_risk / portfolio_value
+        
+        breaches = []
+        if heat > self.config.max_portfolio_heat_pct:
+            breaches.append({
+                'type': 'PORTFOLIO_LIMIT',
+                'rule': 'max_portfolio_heat',
+                'value': heat,
+                'limit': self.config.max_portfolio_heat_pct,
+                'action': 'REDUCE_RISK',
+                'timestamp': datetime.now()
+            })
+        
+        return {'heat': heat, 'breaches': breaches}
+    
+    def get_current_drawdown(self, current_capital: float) -> float:
+        """Get current drawdown from peak."""
+        if self.peak_capital is None or self.peak_capital == 0:
+            return 0.0
+        return (self.peak_capital - current_capital) / self.peak_capital
+    
+    def get_daily_pnl_pct(self, current_capital: float) -> float:
+        """Get today's P&L percentage."""
+        if self.daily_start_capital is None or self.daily_start_capital == 0:
+            return 0.0
+        return (current_capital - self.daily_start_capital) / self.daily_start_capital
+    
+    def _trigger_kill_switch(self, reason: str):
+        """Activate kill switch - halts all trading."""
+        if not self.is_killed:
+            self.is_killed = True
+            self.kill_reason = reason
+            print(f"\n{'='*80}")
+            print(f"🚨 KILL SWITCH ACTIVATED 🚨")
+            print(f"{'='*80}")
+            print(f"Reason: {reason}")
+            print(f"Time: {datetime.now()}")
+            print(f"{'='*80}")
+    
+    def reset_kill_switch(self, reason: str = "Manual override"):
+        """Reset kill switch (requires manual confirmation)."""
+        if self.is_killed:
+            print(f"\n⚠️  Resetting kill switch...")
+            print(f"   Previous reason: {self.kill_reason}")
+            print(f"   Reset reason: {reason}")
+            self.is_killed = False
+            self.kill_reason = None
+    
+    def print_risk_status(self, current_capital: float = None, positions: Dict = None):
+        """Print current risk status."""
+        print("\n" + "="*80)
+        print("📊 RISK STATUS")
+        print("="*80)
+        
+        if self.is_killed:
+            print(f"🚨 KILL SWITCH: ACTIVE")
+            print(f"   Reason: {self.kill_reason}")
+        else:
+            print(f"✅ Kill Switch: Inactive")
+        
+        if current_capital and self.initial_capital:
+            print(f"\n💰 Capital:")
+            print(f"   Current:   ${current_capital:>12,.2f}")
+            if self.peak_capital:
+                print(f"   Peak:      ${self.peak_capital:>12,.2f}")
+                print(f"   Drawdown:  {self.get_current_drawdown(current_capital):>12.1%}")
+            if self.daily_start_capital:
+                print(f"   Daily P&L: {self.get_daily_pnl_pct(current_capital):>12.1%}")
+        
+        print(f"\n⚠️  Risk Limits:")
+        print(f"   Max Drawdown:     {self.config.max_drawdown_pct:.1%}")
+        print(f"   Max Daily Loss:   {self.config.max_daily_loss_pct:.1%}")
+        print(f"   Max Position:     {self.config.max_position_size:.1%}")
+        print(f"   Max Heat:         {self.config.max_portfolio_heat_pct:.1%}")
+        
+        if positions:
+            print(f"\n📈 Portfolio:")
+            print(f"   Positions:      {len(positions):>8}")
+        
+        print("="*80)
+
