@@ -71,8 +71,11 @@ class BenchmarkLoader:
         if cache_file.exists():
             df = pd.read_csv(cache_file, parse_dates=['Date'], index_col='Date')
             
-            # Check if we need to update
-            if df.index.max() < pd.Timestamp(end_date):
+            # Check if we need to update (cache doesn't cover requested date range)
+            start_ts = pd.Timestamp(start_date)
+            end_ts = pd.Timestamp(end_date)
+            
+            if len(df) == 0 or df.index.min() > start_ts or df.index.max() < end_ts:
                 print(f"📥 Updating {ticker} benchmark data...")
                 df = self._fetch_from_yfinance(ticker, start_date, end_date)
                 df.to_csv(cache_file)
@@ -85,10 +88,14 @@ class BenchmarkLoader:
             df = self._fetch_from_yfinance(ticker, start_date, end_date)
             df.to_csv(cache_file)
         
-        # Normalize to initial value
-        if len(df) > 0:
+        # Normalize to initial value (always create TotalValue after filtering)
+        if len(df) > 0 and 'TotalValue' not in df.columns:
             df['TotalValue'] = (df['Close'] / df['Close'].iloc[0]) * initial_value
         
+        # Ensure we have both columns
+        if 'TotalValue' not in df.columns:
+            df['TotalValue'] = initial_value
+            
         return df[['Close', 'TotalValue']]
     
     def _fetch_from_yfinance(
