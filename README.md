@@ -449,6 +449,38 @@ pip install pandas numpy matplotlib plotly scipy jupyterlab
 
 ## 🧪 Testing
 
+### Unit Tests
+
+**Current Coverage: 51%** (376/733 lines tested)
+
+Run the test suite:
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage report
+pytest tests/ --cov=core/portfolio --cov-report=term-missing
+
+# Generate HTML coverage report
+pytest tests/ --cov=core/portfolio --cov-report=html
+```
+
+**Test Suite:**
+- ✅ 21 passing tests
+- Position sizing strategies (FixedFractional, Kelly, ATR)
+- Risk management (stop-loss, take-profit, concentration limits)
+- Portfolio tracking (positions, P&L, cash management)
+- Integration tests (full backtest workflow)
+
+**Module Coverage:**
+- `execution_engine.py`: 84% ✅
+- `portfolio.py`: 76% ✅
+- `position_sizers.py`: 65% ⚠️
+- `portfolio_manager_v2.py`: 47% ⚠️
+- `risk_manager.py`: 35% (more tests coming)
+
+See `tests/README.md` for detailed documentation.
+
 ### Quick Test
 ```bash
 # Test multi-strategy system

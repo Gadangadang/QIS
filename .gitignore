@@ -41,6 +41,11 @@ Thumbs.db
 
 # Personal notes
 claude_read.md
+ROADMAP.md
+
+# Test coverage
+.coverage
+htmlcov/
 
 # Reports (generated HTML files)
 reports/*.html
