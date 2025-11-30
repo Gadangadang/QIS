@@ -1,5 +1,11 @@
 # QuantTrading
 
+[![Tests](https://github.com/Gadangadang/QuantTrading/actions/workflows/test.yml/badge.svg)](https://github.com/Gadangadang/QuantTrading/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Gadangadang/QuantTrading/branch/main/graph/badge.svg)](https://codecov.io/gh/Gadangadang/QuantTrading)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: Private](https://img.shields.io/badge/license-Private-red.svg)]()
+
 A professional-grade multi-asset, multi-strategy quantitative portfolio management system with advanced signal generation, ensemble methods, comprehensive risk controls, and production-ready backtesting infrastructure.
 
 ## 🎯 Overview
@@ -428,23 +434,40 @@ with open('reports/risk.html', 'w') as f:
 
 ### Requirements
 - Python 3.9+
-- pandas, numpy
-- matplotlib, plotly
-- scipy (for statistical analysis)
-- jupyter/jupyterlab (for notebooks)
+- See `requirements.txt` for full dependency list
 
-### Setup
+### Quick Setup (pip)
 ```bash
 # Clone repository
 git clone https://github.com/Gadangadang/QuantTrading.git
 cd QuantTrading
 
-# Create environment using conda (recommended)
+# Install production dependencies
+pip install -r requirements.txt
+
+# Or install with development tools
+pip install -r requirements-dev.txt
+```
+
+### Conda Setup (Recommended)
+```bash
+# Create environment from environment.yml
 conda env create -f environment.yml
 conda activate quant_trading
 
-# Or use pip
-pip install pandas numpy matplotlib plotly scipy jupyterlab
+# Or create fresh environment
+conda create -n quant_trading python=3.11
+conda activate quant_trading
+pip install -r requirements.txt
+```
+
+### Verify Installation
+```bash
+# Run tests to verify everything works
+pytest tests/ -v
+
+# Or check imports
+python -c "import pandas, numpy, matplotlib, plotly; print('✅ All dependencies installed')"
 ```
 
 ## 🧪 Testing
@@ -480,6 +503,18 @@ pytest tests/ --cov=core/portfolio --cov-report=html
 - `risk_manager.py`: 35% (more tests coming)
 
 See `tests/README.md` for detailed documentation.
+
+### Continuous Integration
+
+GitHub Actions automatically runs tests on every push:
+- ✅ Tests across Python 3.9, 3.10, 3.11
+- ✅ Coverage reporting with Codecov
+- ✅ Code quality checks (black, flake8, isort)
+- ✅ 50% minimum coverage requirement
+
+**CI Pipeline:** `.github/workflows/test.yml`
+
+**Dependabot:** Automated weekly dependency updates
 
 ### Quick Test
 ```bash
