@@ -1,12 +1,21 @@
 """
 Paper Trading Engine
 
+⚠️ DEPRECATED: This module uses the old portfolio_manager architecture.
+    Needs refactoring to work with core.portfolio.portfolio_manager_v2.
+    Currently maintained for reference but not used in active workflows.
+
 Orchestrates paper trading workflows including:
 - State persistence across daily runs
 - Incremental updates with new data
 - Performance comparison vs backtest
 - Portfolio status tracking
 - Daily reporting
+
+TODO: Refactor to use:
+  - core.portfolio.portfolio_manager_v2.PortfolioManagerV2
+  - core.portfolio.risk_manager.RiskManager
+  - core.portfolio.backtest_result.BacktestResult
 """
 
 import pandas as pd
@@ -17,8 +26,9 @@ from typing import Dict, Optional, Tuple
 import pickle
 import warnings
 
-from core.portfolio_manager import PortfolioManager, PortfolioConfig, BacktestResult
-from core.risk_manager import RiskManager
+# Using old architecture - see TODO above for migration path
+from archive.cleanup_2025_11_30.old_core_duplicates.portfolio_manager import PortfolioManager, PortfolioConfig, BacktestResult
+from archive.cleanup_2025_11_30.old_core_duplicates.risk_manager import RiskManager
 
 
 class PaperTradingState:
@@ -143,7 +153,7 @@ class PaperTradingEngine:
         # Run initial backtest to get starting state
         # IMPORTANT: Use a fresh risk manager for live trading
         # We don't want to inherit drawdown stops from the reference backtest
-        from core.risk_manager import RiskManager
+        from core.portfolio.risk_manager import RiskManager
         live_risk_manager = RiskManager(self.config.risk_manager.config)
         
         # Create a fresh config with the new risk manager
@@ -189,8 +199,8 @@ class PaperTradingEngine:
         Returns:
             Tuple of (updated_equity, new_trades)
         """
-        from core.portfolio_manager import run_multi_asset_backtest
-        from core.risk_manager import RiskManager
+        from core.portfolio.portfolio_manager import run_multi_asset_backtest
+        from core.portfolio.risk_manager import RiskManager
         
         # Use a fresh risk manager for each update to avoid carrying over stale violations
         live_risk_manager = RiskManager(self.config.risk_manager.config)
