@@ -10,30 +10,7 @@ You have a **solid, portfolio-ready quantitative trading system** with:
 - ✅ Walk-forward validation framework
 - ✅ Clean, professional codebase on GitHub
 
-**Job Application Readiness: 85% Ready** 🎯
 
----
-
-## Phase 1: Stabilization & Validation (Priority: CRITICAL)
-**Timeline: 2-3 days**
-**Goal: Make existing work bulletproof and demonstrable**
-
-### 1.1 Fix HTML Report Graphs ⚠️
-**Priority: HIGH** (Currently broken charts hurt presentation)
-
-**Tasks:**
-- [ ] Debug Plotly JSON serialization in `MultiStrategyReporter`
-- [ ] Fix chart rendering in `RiskDashboard`
-- [ ] Test all report types end-to-end
-- [ ] Add error handling for missing data
-- [ ] Ensure charts are responsive (mobile-friendly)
-
-**Acceptance Criteria:**
-- All charts render correctly in browser
-- Reports open automatically after generation
-- No JavaScript console errors
-
-**Time Estimate:** 2-4 hours
 
 ---
 
