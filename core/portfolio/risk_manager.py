@@ -1,11 +1,13 @@
 """
-RiskManager class - Enforces risk rules and calculates position sizes.
+RiskManager class - Enforces risk rules and monitors portfolio risk.
 
 Responsibilities:
-- Calculate position sizes based on risk parameters
 - Check risk limits (stops, concentration)
 - Monitor portfolio-level risk
 - Kill switches and circuit breakers for catastrophic losses
+- Position sizing delegated to PositionSizer classes
+
+Note: Position sizing logic has been moved to position_sizers.py for better separation of concerns.
 """
 
 from dataclasses import dataclass
@@ -13,6 +15,8 @@ from typing import Optional, Dict, List, Tuple
 from datetime import date, datetime
 import numpy as np
 import pandas as pd
+
+from .position_sizers import PositionSizer, FixedFractionalSizer
 
 
 @dataclass
@@ -35,11 +39,16 @@ class RiskConfig:
 
 class RiskManager:
     """
-    Enforces risk rules and calculates position sizes.
+    Enforces risk rules and monitors portfolio risk.
+    
+    Position sizing is now handled by injected PositionSizer classes.
     
     Example:
+        from core.portfolio.position_sizers import FixedFractionalSizer
+        
         config = RiskConfig(risk_per_trade=0.02, max_position_size=0.20, stop_loss_pct=0.10)
-        risk_mgr = RiskManager(config)
+        sizer = FixedFractionalSizer(max_position_pct=0.20, risk_per_trade=0.02)
+        risk_mgr = RiskManager(config, position_sizer=sizer)
         
         shares = risk_mgr.calculate_position_size(
             ticker='ES',
@@ -51,27 +60,25 @@ class RiskManager:
         should_exit = risk_mgr.check_stop_loss(position)
     """
     
-    def __init__(self, config: RiskConfig):
+    def __init__(self, config: RiskConfig, position_sizer: Optional[PositionSizer] = None):
         """
         Initialize risk manager with configuration.
         
         Args:
             config: RiskConfig object with risk parameters
+            position_sizer: PositionSizer instance (if None, uses FixedFractionalSizer)
         """
         self.config = config
         
-        # Kill switch state
-        self.is_killed = False
-        self.kill_reason = None
-        
-        # Capital tracking for kill switches
-        self.initial_capital = None
-        self.peak_capital = None
-        self.daily_start_capital = None
-        self.last_reset_date = None
-        
-        # Breach tracking
-        self.breach_history: List[Dict] = []
+        # Use provided sizer or create default
+        if position_sizer is None:
+            self.position_sizer = FixedFractionalSizer(
+                max_position_pct=config.max_position_size,
+                risk_per_trade=config.risk_per_trade,
+                min_trade_value=config.min_trade_value
+            )
+        else:
+            self.position_sizer = position_sizer
     
     def calculate_position_size(
         self, 
@@ -79,58 +86,35 @@ class RiskManager:
         signal: float,
         current_price: float,
         portfolio_value: float,
-        volatility: Optional[float] = None
+        volatility: Optional[float] = None,
+        **kwargs
     ) -> float:
         """
-        Calculate number of shares to buy based on risk rules.
+        Calculate number of shares to buy using the configured position sizer.
         
-        Uses the smaller of:
-        1. Max position size limit (% of portfolio)
-        2. Risk-based sizing (based on stop loss if configured)
+        This method now delegates to the injected PositionSizer instance.
         
         Args:
             ticker: Asset ticker
-            signal: Signal strength (0 to 1, where 1 = full position)
+            signal: Signal strength (-1 to 1, where 1 = full long, -1 = full short)
             current_price: Current price per share
             portfolio_value: Current portfolio value
             volatility: Optional volatility measure (annualized std)
+            **kwargs: Additional parameters for specific sizers (atr, win_rate, etc.)
             
         Returns:
             Number of shares to buy (integer)
         """
-        if portfolio_value <= 0 or current_price <= 0:
-            return 0
-        
-        # Method 1: Fixed percentage of portfolio
-        max_position_value = portfolio_value * self.config.max_position_size
-        shares_from_size_limit = max_position_value / current_price
-        
-        # Method 2: Risk-based sizing (if we have stop loss configured)
-        if self.config.stop_loss_pct and self.config.stop_loss_pct > 0:
-            # Size position based on how much we're willing to lose
-            risk_amount = portfolio_value * self.config.risk_per_trade
-            loss_per_share = current_price * self.config.stop_loss_pct
-            
-            if loss_per_share > 0:
-                shares_from_risk = risk_amount / loss_per_share
-                # Use the smaller of the two
-                shares = min(shares_from_size_limit, shares_from_risk)
-            else:
-                shares = shares_from_size_limit
-        else:
-            shares = shares_from_size_limit
-        
-        # Scale by signal strength (if signal is 0.5, use half position)
-        shares *= abs(signal)
-        
-        # Round down to whole shares
-        shares = int(shares)
-        
-        # Check minimum trade value
-        if shares * current_price < self.config.min_trade_value:
-            return 0
-        
-        return shares
+        # Delegate to position sizer
+        return self.position_sizer.calculate_size(
+            ticker=ticker,
+            signal=signal,
+            current_price=current_price,
+            portfolio_value=portfolio_value,
+            stop_loss_pct=self.config.stop_loss_pct,
+            volatility=volatility,
+            **kwargs
+        )
     
     def check_stop_loss(self, position) -> bool:
         """

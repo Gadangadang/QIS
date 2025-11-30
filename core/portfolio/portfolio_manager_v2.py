@@ -7,13 +7,14 @@ Responsibilities:
 - Generate BacktestResult
 """
 
-from typing import Dict
+from typing import Dict, Optional
 import pandas as pd
 
 from .portfolio import Portfolio
 from .risk_manager import RiskManager, RiskConfig
 from .execution_engine import ExecutionEngine, ExecutionConfig
 from .backtest_result import BacktestResult
+from .position_sizers import PositionSizer, FixedFractionalSizer
 
 
 class PortfolioManagerV2:
@@ -46,7 +47,8 @@ class PortfolioManagerV2:
         stop_loss_pct: float = None,
         take_profit_pct: float = None,
         rebalance_threshold: float = None,
-        rebalance_frequency: str = 'never'
+        rebalance_frequency: str = 'never',
+        position_sizer: Optional[PositionSizer] = None
     ):
         """
         Initialize portfolio manager with configuration.
@@ -63,6 +65,8 @@ class PortfolioManagerV2:
                                None = no drift-based rebalancing
             rebalance_frequency: 'daily', 'weekly', 'monthly', 'never'
                                'never' = only drift-based rebalancing
+            position_sizer: PositionSizer instance for calculating position sizes
+                          If None, uses FixedFractionalSizer with max_position_size and risk_per_trade
         """
         self.initial_capital = initial_capital
         self.rebalance_threshold = rebalance_threshold
@@ -82,7 +86,14 @@ class PortfolioManagerV2:
             slippage_bps=slippage_bps
         )
         
-        self.risk_manager = RiskManager(self.risk_config)
+        # Create position sizer if not provided
+        if position_sizer is None:
+            position_sizer = FixedFractionalSizer(
+                max_position_pct=max_position_size,
+                risk_per_trade=risk_per_trade
+            )
+        
+        self.risk_manager = RiskManager(self.risk_config, position_sizer=position_sizer)
         self.execution_engine = ExecutionEngine(self.execution_config)
     
     def run_backtest(
