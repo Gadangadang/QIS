@@ -413,6 +413,86 @@ class RiskParitySizer(PositionSizer):
         return self._round_to_shares(shares, self.min_trade_value, current_price)
 
 
+class FuturesContractSizer(PositionSizer):
+    """
+    Futures contract position sizing with integer contracts.
+    
+    Ensures position sizes are in whole contracts based on contract multiplier.
+    Uses fixed fractional sizing but rounds to integer contracts.
+    
+    Example:
+        # ES futures with 50x multiplier
+        sizer = FuturesContractSizer(
+            contract_multipliers={'ES': 50, 'CL': 1000, 'GC': 100},
+            max_position_pct=0.25,
+            risk_per_trade=0.02
+        )
+        contracts = sizer.calculate_size('ES', signal=1.0, current_price=4500, 
+                                        portfolio_value=1000000)
+    """
+    
+    def __init__(
+        self,
+        contract_multipliers: Dict[str, float],
+        max_position_pct: float = 0.25,
+        risk_per_trade: float = 0.02,
+        min_contracts: int = 1
+    ):
+        """
+        Initialize futures contract sizer.
+        
+        Args:
+            contract_multipliers: Dict of ticker -> contract multiplier (e.g., {'ES': 50})
+            max_position_pct: Maximum position size as % of portfolio
+            risk_per_trade: Risk per trade as % of portfolio
+            min_contracts: Minimum contracts per trade (default 1)
+        """
+        self.contract_multipliers = contract_multipliers
+        self.max_position_pct = max_position_pct
+        self.risk_per_trade = risk_per_trade
+        self.min_contracts = min_contracts
+    
+    def calculate_size(
+        self,
+        ticker: str,
+        signal: float,
+        current_price: float,
+        portfolio_value: float,
+        **kwargs
+    ) -> float:
+        """Calculate position size in integer contracts."""
+        if portfolio_value <= 0 or current_price <= 0 or abs(signal) < 0.01:
+            return 0
+        
+        # Get contract multiplier
+        multiplier = self.contract_multipliers.get(ticker, 1)
+        
+        # Calculate max allocation
+        max_allocation = portfolio_value * self.max_position_pct
+        
+        # Calculate notional value per contract
+        notional_per_contract = current_price * multiplier
+        
+        if notional_per_contract <= 0:
+            return 0
+        
+        # Calculate fractional contracts
+        contracts_float = max_allocation / notional_per_contract
+        
+        # Scale by signal strength
+        contracts_float = contracts_float * abs(signal)
+        
+        # Round down to integer contracts
+        contracts_int = int(np.floor(contracts_float))
+        
+        # Check minimum contracts
+        if contracts_int < self.min_contracts:
+            return 0
+        
+        # Return as "shares" (actually contracts, but portfolio manager treats as shares)
+        return float(contracts_int)
+
+
 # Convenience factory function
 def create_position_sizer(
     method: str = 'fixed_fractional',
@@ -422,7 +502,8 @@ def create_position_sizer(
     Factory function to create position sizers.
     
     Args:
-        method: Sizing method ('fixed_fractional', 'kelly', 'atr', 'volatility_scaled', 'risk_parity')
+        method: Sizing method ('fixed_fractional', 'kelly', 'atr', 'volatility_scaled', 
+                               'risk_parity', 'futures_contract')
         **kwargs: Parameters for the chosen sizer
         
     Returns:
@@ -430,13 +511,16 @@ def create_position_sizer(
         
     Example:
         sizer = create_position_sizer('kelly', kelly_fraction=0.5, max_position_pct=0.30)
+        sizer = create_position_sizer('futures_contract', 
+                                     contract_multipliers={'ES': 50, 'CL': 1000})
     """
     sizers = {
         'fixed_fractional': FixedFractionalSizer,
         'kelly': KellySizer,
         'atr': ATRSizer,
         'volatility_scaled': VolatilityScaledSizer,
-        'risk_parity': RiskParitySizer
+        'risk_parity': RiskParitySizer,
+        'futures_contract': FuturesContractSizer
     }
     
     if method not in sizers:

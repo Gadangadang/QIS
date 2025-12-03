@@ -48,13 +48,13 @@ class HybridAdaptiveSignal(SignalModel):
         df["MA_Slow"] = close.rolling(self.mom_slow).mean()
         
         # Initialize position
-        df["Position"] = 0
+        df['Signal'] = 0
         
         # Build positions bar-by-bar
         warmup = max(self.vol_window, self.mom_slow)
         
         for i in range(warmup, len(df)):
-            prev_position = df.iloc[i - 1]["Position"]
+            prev_position = df.iloc[i - 1]['Signal']
             high_vol = df.iloc[i]["HighVol"]
             z_score = df.iloc[i]["MR_Z"]
             price = df.iloc[i]["Close"]
@@ -66,50 +66,50 @@ class HybridAdaptiveSignal(SignalModel):
                 if prev_position == 0:
                     # Enter on extreme deviations
                     if z_score <= -self.mr_entry_z:
-                        df.iloc[i, df.columns.get_loc("Position")] = 1  # Long
+                        df.iloc[i, df.columns.get_loc('Signal')] = 1  # Long
                     elif z_score >= self.mr_entry_z:
-                        df.iloc[i, df.columns.get_loc("Position")] = -1  # Short
+                        df.iloc[i, df.columns.get_loc('Signal')] = -1  # Short
                     else:
-                        df.iloc[i, df.columns.get_loc("Position")] = 0
+                        df.iloc[i, df.columns.get_loc('Signal')] = 0
                         
                 elif prev_position == 1:
                     # Exit long when mean reverted
                     if z_score >= -self.mr_exit_z or z_score > self.mr_entry_z:
-                        df.iloc[i, df.columns.get_loc("Position")] = 0
+                        df.iloc[i, df.columns.get_loc('Signal')] = 0
                     else:
-                        df.iloc[i, df.columns.get_loc("Position")] = 1
+                        df.iloc[i, df.columns.get_loc('Signal')] = 1
                         
                 elif prev_position == -1:
                     # Exit short when mean reverted
                     if z_score <= self.mr_exit_z or z_score < -self.mr_entry_z:
-                        df.iloc[i, df.columns.get_loc("Position")] = 0
+                        df.iloc[i, df.columns.get_loc('Signal')] = 0
                     else:
-                        df.iloc[i, df.columns.get_loc("Position")] = -1
+                        df.iloc[i, df.columns.get_loc('Signal')] = -1
             
             # LOW VOLATILITY REGIME: Momentum
             else:
                 if prev_position == 0:
                     # Enter on trend alignment
                     if price > ma_fast and ma_fast > ma_slow:
-                        df.iloc[i, df.columns.get_loc("Position")] = 1  # Long trend
+                        df.iloc[i, df.columns.get_loc('Signal')] = 1  # Long trend
                     elif price < ma_fast and ma_fast < ma_slow:
-                        df.iloc[i, df.columns.get_loc("Position")] = -1  # Short trend
+                        df.iloc[i, df.columns.get_loc('Signal')] = -1  # Short trend
                     else:
-                        df.iloc[i, df.columns.get_loc("Position")] = 0
+                        df.iloc[i, df.columns.get_loc('Signal')] = 0
                         
                 elif prev_position == 1:
                     # Exit long if trend breaks
                     if price < ma_fast:
-                        df.iloc[i, df.columns.get_loc("Position")] = 0
+                        df.iloc[i, df.columns.get_loc('Signal')] = 0
                     else:
-                        df.iloc[i, df.columns.get_loc("Position")] = 1
+                        df.iloc[i, df.columns.get_loc('Signal')] = 1
                         
                 elif prev_position == -1:
                     # Exit short if trend breaks
                     if price > ma_fast:
-                        df.iloc[i, df.columns.get_loc("Position")] = 0
+                        df.iloc[i, df.columns.get_loc('Signal')] = 0
                     else:
-                        df.iloc[i, df.columns.get_loc("Position")] = -1
+                        df.iloc[i, df.columns.get_loc('Signal')] = -1
 
-        df["Position"] = df["Position"].astype(int)
+        df['Signal'] = df['Signal'].astype(int)
         return df

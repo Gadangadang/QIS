@@ -38,6 +38,12 @@ class MultiAssetLoader:
         'ES': 'ES=F',
         'NQ': 'NQ=F',
         'GC': 'GC=F',
+        'CL': 'CL=F',  # Crude Oil
+        'NG': 'NG=F',  # Natural Gas
+        'RB': 'RB=F',  # Gasoline
+        'HO': 'HO=F',  # Heating Oil
+        "MME": "MME=F",
+        "NIY": "NIY=F",
     }
     
     def __init__(self, dataset_dir: Optional[Path] = None, use_yfinance: bool = True):
@@ -56,17 +62,33 @@ class MultiAssetLoader:
         Load a single asset's price data.
         
         Args:
-            ticker: Asset ticker (ES, NQ, GC, SPX)
+            ticker: Asset ticker (ES, NQ, GC, CL, NG, etc.)
             
         Returns:
             DataFrame with Date, Open, High, Low, Close, Volume
         """
-        if ticker not in self.ASSET_FILES:
-            raise ValueError(f"Unknown ticker: {ticker}. Available: {list(self.ASSET_FILES.keys())}")
+        # Check if ticker is known at all (either CSV or yfinance)
+        if ticker not in self.ASSET_FILES and ticker not in self.YFINANCE_SYMBOLS:
+            available = list(set(list(self.ASSET_FILES.keys()) + list(self.YFINANCE_SYMBOLS.keys())))
+            raise ValueError(f"Unknown ticker: {ticker}. Available: {sorted(available)}")
         
-        filepath = self.dataset_dir / self.ASSET_FILES[ticker]
-        if not filepath.exists():
-            raise FileNotFoundError(f"Data file not found: {filepath}")
+        # If ticker has CSV file, load it
+        if ticker in self.ASSET_FILES:
+            filepath = self.dataset_dir / self.ASSET_FILES[ticker]
+            if not filepath.exists():
+                # CSV file specified but not found - try yfinance if enabled
+                if self.use_yfinance and ticker in self.YFINANCE_SYMBOLS:
+                    print(f"  {ticker}: CSV not found, fetching from yfinance only")
+                    return self._fetch_from_yfinance(ticker, start_date='2015-01-01')
+                else:
+                    raise FileNotFoundError(f"Data file not found: {filepath}")
+        else:
+            # No CSV file - use yfinance only
+            if self.use_yfinance and ticker in self.YFINANCE_SYMBOLS:
+                print(f"  {ticker}: Fetching from yfinance (no CSV file)")
+                return self._fetch_from_yfinance(ticker, start_date='2015-01-01')
+            else:
+                raise ValueError(f"No data source available for {ticker}")
         
         # Load data - handle CSVs with misaligned "Price" column
         # First check if this is a problematic CSV (has Price column)
@@ -107,6 +129,59 @@ class MultiAssetLoader:
         df['Ticker'] = ticker
         
         return df
+    
+    def _fetch_from_yfinance(self, ticker: str, start_date: str = '2015-01-01', end_date: Optional[str] = None) -> pd.DataFrame:
+        """
+        Fetch data entirely from yfinance (for tickers without CSV files).
+        
+        Args:
+            ticker: Asset ticker (CL, NG, etc.)
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD), defaults to today
+            
+        Returns:
+            DataFrame with Date, Open, High, Low, Close, Volume, Ticker
+        """
+        if ticker not in self.YFINANCE_SYMBOLS:
+            raise ValueError(f"No yfinance symbol for {ticker}")
+        
+        try:
+            import yfinance as yf
+            
+            yf_symbol = self.YFINANCE_SYMBOLS[ticker]
+            yf_ticker = yf.Ticker(yf_symbol)
+            
+            # Fetch data
+            end = end_date or datetime.now().strftime('%Y-%m-%d')
+            data = yf_ticker.history(start=start_date, end=end)
+            
+            if len(data) == 0:
+                raise ValueError(f"No data returned from yfinance for {ticker}")
+            
+            # Convert to our format
+            df = pd.DataFrame({
+                'Date': data.index,
+                'Open': data['Open'].values,
+                'High': data['High'].values,
+                'Low': data['Low'].values,
+                'Close': data['Close'].values,
+                'Volume': data['Volume'].values,
+                'Ticker': ticker
+            })
+            
+            # Reset index and ensure Date is datetime (remove timezone)
+            df = df.reset_index(drop=True)
+            df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+            
+            # Remove invalid rows
+            df = df[df['Close'] > 0].reset_index(drop=True)
+            
+            print(f"  ✅ {ticker}: Fetched {len(df)} rows from {df['Date'].min().date()} to {df['Date'].max().date()}")
+            
+            return df
+            
+        except Exception as e:
+            raise ValueError(f"Failed to fetch data for {ticker} from yfinance: {e}")
     
     def fetch_yfinance_data(self, ticker: str, start_date: pd.Timestamp) -> Optional[pd.DataFrame]:
         """
