@@ -128,102 +128,130 @@ Compare against SPY with institutional metrics:
 
 ## 📊 Quick Start
 
-### 1. Simple Backtest with New Signals
+### 1. Simple Backtest with Futures Contract Sizing
 
 ```python
 from core.portfolio.portfolio_manager_v2 import PortfolioManagerV2
+from core.portfolio.position_sizers import FuturesContractSizer
 from core.multi_asset_loader import load_assets
-from signals.trend_following_long_short import TrendFollowingLongShort
+from signals.momentum import MomentumSignalV2
+
+# Define contract multipliers for futures
+CONTRACT_MULTIPLIERS = {
+    'CL': 1000,   # Crude Oil (1,000 barrels per contract)
+    'NG': 10000,  # Natural Gas (10,000 MMBtu per contract)
+    'GC': 100,    # Gold (100 troy ounces per contract)
+    'ES': 50,     # S&P 500 E-mini (50x index value)
+    'NQ': 20      # Nasdaq 100 E-mini (20x index value)
+}
 
 # Load data
-prices = load_assets(['ES'], start_date='2015-01-01', end_date='2024-12-31')
+prices = load_assets(['CL', 'NG', 'GC'], start_date='2017-01-01', use_yfinance=True)
+
+# Create futures contract sizer (ensures integer contracts)
+futures_sizer = FuturesContractSizer(
+    contract_multipliers=CONTRACT_MULTIPLIERS,
+    max_position_pct=0.25,
+    risk_per_trade=0.02,
+    min_contracts=1
+)
 
 # Generate signals
-signal_gen = TrendFollowingLongShort(
-    fast_period=20,
-    slow_period=100,
-    momentum_threshold=0.02
-)
-signals = {'ES': signal_gen.generate(prices['ES'])}
+signal_gen = MomentumSignalV2(lookback=60, entry_threshold=0.02)
+signals = {ticker: signal_gen.generate(prices[ticker]) for ticker in prices.keys()}
 
-# Run backtest
+# Run backtest with integer contract sizing
 pm = PortfolioManagerV2(
-    initial_capital=100000,
+    initial_capital=500_000,
     risk_per_trade=0.02,
-    max_position_size=0.30,
+    max_position_size=0.25,
     transaction_cost_bps=3.0,
-    slippage_bps=2.0
+    slippage_bps=2.0,
+    position_sizer=futures_sizer  # Use futures contract sizer
 )
 
 result = pm.run_backtest(signals, prices)
 result.print_summary()
-result.plot_equity_curve()
 ```
 
-### 2. Multi-Strategy Portfolio with Ensemble
+### 2. Multi-Strategy Portfolio with Clean Architecture
 
 ```python
-from signals.ensemble import AdaptiveEnsemble
-from signals.momentum import MomentumSignalV2
+from utils.plotter import PortfolioPlotter
+from utils.formatter import PerformanceSummary
 
 # Configure strategies
 strategies = [
     {
-        'name': 'Adaptive_Ensemble',
-        'signal_generator': AdaptiveEnsemble(
-            strategies=[
-                ('momentum', MomentumSignalV2(lookback=60), 0.5),
-                ('trend_ls', TrendFollowingLongShort(), 0.5)
-            ],
-            method='adaptive',
-            adaptive_lookback=60,
-            signal_threshold=0.3
+        'name': 'Commodities_HybridAdaptive',
+        'signal_generator': HybridAdaptiveSignal(
+            vol_window=30, mr_window=15, mom_fast=30, mom_slow=90
         ),
-        'assets': ['ES', 'GC'],
-        'capital': 50000
+        'assets': ['CL', 'NG', 'GC'],
+        'capital': 500_000
     },
     {
-        'name': 'TrendFollowing_LS',
-        'signal_generator': TrendFollowingLongShort(),
-        'assets': ['NQ'],
-        'capital': 30000
+        'name': 'Equities_Momentum',
+        'signal_generator': MomentumSignalV2(
+            lookback=60, entry_threshold=0.02
+        ),
+        'assets': ['ES', 'NQ'],
+        'capital': 500_000
     }
 ]
 
-# Run all strategies and generate reports
-from core.multi_strategy_reporter import MultiStrategyReporter
-from core.risk_dashboard import RiskDashboard
+# Run all strategies
+strategy_results = {}
+for strat in strategies:
+    signals = {asset: strat['signal_generator'].generate(prices[asset]) 
+               for asset in strat['assets']}
+    
+    pm = PortfolioManagerV2(
+        initial_capital=strat['capital'],
+        position_sizer=futures_sizer
+    )
+    result = pm.run_backtest(signals, prices)
+    strategy_results[strat['name']] = {
+        'result': result,
+        'capital': strat['capital'],
+        'assets': strat['assets']
+    }
 
-reporter = MultiStrategyReporter()
-risk_dash = RiskDashboard()
+# Generate visualizations using utilities
+plotter = PortfolioPlotter(strategy_results)
+plotter.plot_equity_curves(show_individual=True, show_combined=True)
 
-# Generate HTML reports
-performance_html = reporter.generate_report(
-    strategy_results=results,
-    combined_equity=combined_equity,
-    benchmark_data=spy_data,
-    title="Multi-Strategy Performance"
+# Load benchmark and compare
+benchmark_loader = BenchmarkLoader(cache_dir="Dataset")
+benchmark_data = benchmark_loader.load_benchmark('SPY', start_date='2017-01-01')
+
+summary = PerformanceSummary(
+    strategy_results, 
+    benchmark_data=benchmark_data, 
+    period_label='IN-SAMPLE'
 )
-
-risk_html = risk_dash.generate_dashboard(
-    strategy_results=results,
-    combined_equity=combined_equity,
-    benchmark_data=spy_data
-)
+summary.print_benchmark_comparison()
+summary.print_strategy_rankings()
 ```
 
 ### 3. Explore Research Notebooks
 
 ```bash
-jupyter lab notebooks/multi_strategy_with_ensemble.ipynb
+jupyter lab notebooks/multi_strategy_refactored.ipynb
 ```
 
 Comprehensive notebooks demonstrating:
+- **multi_strategy_refactored.ipynb** - Clean multi-strategy architecture with ensemble methods
+- **multi_strategy_commodities.ipynb** - Futures trading with integer contract sizing
+- **oil_gas_exploration.ipynb** - Oil & gas futures development notebook
+
+Key features showcased:
 - Multi-strategy portfolio construction
+- Futures contract position sizing
 - Adaptive ensemble configuration
 - Benchmark comparison (SPY)
-- Performance attribution
-- Risk analysis
+- Performance attribution using PortfolioPlotter
+- Risk analysis using PerformanceSummary
 - Signal correlation studies
 
 ## 🏗️ Project Structure
@@ -236,42 +264,55 @@ QuantTrading/
 │   │   ├── portfolio.py                  # State management
 │   │   ├── risk_manager.py               # Risk controls
 │   │   ├── execution_engine.py           # Order execution
-│   │   └── backtest_result.py            # Results container
+│   │   ├── backtest_result.py            # Results container
+│   │   └── position_sizers.py            # Position sizing strategies
 │   │
-│   ├── multi_asset_loader.py             # Futures data loader
+│   ├── futures/                           # Futures infrastructure
+│   │   ├── rollover_handler.py           # Contract rollover logic
+│   │   └── __init__.py
+│   │
+│   ├── asset_registry.py                 # Asset metadata registry
+│   ├── multi_asset_loader.py             # Multi-asset data loader
 │   ├── multi_strategy_reporter.py        # Performance reports (HTML)
 │   ├── risk_dashboard.py                 # Risk analysis dashboard
-│   ├── benchmark.py                      # SPY comparison tools
-│   └── optimizer.py                      # Walk-forward optimization
+│   ├── benchmark.py                      # Benchmark comparison tools
+│   └── paper_trading_engine.py           # Live paper trading
 │
 ├── signals/                               # Trading strategies
 │   ├── base.py                           # SignalModel abstract base
 │   ├── momentum.py                       # Momentum strategies
 │   ├── mean_reversion.py                 # Counter-trend strategies
-│   ├── trend_following_long_short.py     # Long-short trend (NEW)
-│   ├── ensemble.py                       # Adaptive ensembles (NEW)
-│   └── README_NEW_SIGNALS.md             # Signal documentation
-│
-├── notebooks/                             # Research notebooks
-│   ├── multi_strategy_with_ensemble.ipynb # Main demo (comprehensive)
-│   ├── test_new_signals.ipynb            # Signal testing
-│   └── backtest_momentum.ipynb           # Single-strategy research
-│
-├── reports/                               # Generated HTML reports
-│   ├── ensemble_performance.html         # Portfolio performance
-│   └── ensemble_risk_dashboard.html      # Risk analysis
-│
-├── Dataset/                               # Market data
-│   ├── spx_data.csv                      # S&P 500 futures (ES)
-│   ├── nq_data.csv                       # NASDAQ futures (NQ)
-│   └── gc_data.csv                       # Gold futures (GC)
+│   ├── hybrid_adaptive.py                # Hybrid adaptive signals
+│   ├── trend_following_long_short.py     # Long-short trend
+│   └── ensemble.py                       # Adaptive ensembles
 │
 ├── utils/                                 # Utilities
-│   ├── logger.py                         # Logging
-│   └── metrics.py                        # Performance metrics
+│   ├── plotter.py                        # Visualization utilities
+│   ├── formatter.py                      # Performance formatters
+│   └── logger.py                         # Logging
+│
+├── notebooks/                             # Research notebooks
+│   ├── multi_strategy_refactored.ipynb   # Main multi-strategy demo
+│   ├── multi_strategy_commodities.ipynb  # Commodities futures
+│   └── oil_gas_exploration.ipynb         # Oil & gas development
+│
+├── tests/                                 # Test suite
+│   ├── test_portfolio_core.py            # Portfolio & risk tests
+│   ├── conftest.py                       # Test fixtures
+│   └── README.md                         # Test documentation
+│
+├── readmes/                               # Documentation
+│   ├── COMMODITIES_EXPANSION_PLAN.md     # Commodities roadmap
+│   └── OIL_GAS_IMPLEMENTATION.md         # Oil/gas implementation
+│
+├── Dataset/                               # Market data
+│   ├── spx_data_v1.csv                   # S&P 500 futures (ES)
+│   ├── fix_data.py                       # Data cleaning scripts
+│   └── energy/                           # Commodity data (planned)
 │
 ├── backtest/                              # Legacy backtest engine
-├── live/                                  # Paper trading
+├── live/                                  # Paper trading scripts
+├── logs/                                  # Trading logs
 └── config/                                # Configuration files
 ```
 
