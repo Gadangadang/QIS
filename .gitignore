@@ -13,6 +13,7 @@ __pycache__/
 # Jupyter Notebook
 .ipynb_checkpoints/
 *.ipynb_checkpoints
+notebooks/archive/
 
 # Logs and test outputs
 logs/
