@@ -502,10 +502,12 @@ class BacktestOrchestrator:
             benchmark_name=self.benchmark_name
         )
         
-        plotter.plot_equity_curves(show_individual=show_individual, figsize=figsize)
-        
-        if show_benchmark and self.benchmark_data is not None:
-            plotter.plot_benchmark_comparison(figsize=figsize)
+        # plot_equity_curves handles benchmark internally when show_benchmark=True
+        plotter.plot_equity_curves(
+            show_individual=show_individual, 
+            show_benchmark=show_benchmark,
+            figsize=figsize
+        )
     
     def get_performance_summary(self, benchmark_name: Optional[str] = None) -> PerformanceSummary:
         """

@@ -1,0 +1,2 @@
+periods,avg_return,median_return,best_return,worst_return,win_rate,avg_sharpe,cumulative_return,final_oos_return,best_params
+2,0.03707349445179997,0.03707349445179997,0.0626015501185,0.011545438785099948,1.0,0.6554194659450832,0.07486975126834539,0.02394512092159995,{'lookback': 10}
