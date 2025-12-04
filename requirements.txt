@@ -13,6 +13,7 @@ yfinance>=0.2.0
 
 # Backtesting & Analysis
 backtrader>=1.9.78
+tqdm>=4.65.0
 
 # Development & Testing
 pytest>=7.0.0
