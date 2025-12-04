@@ -196,10 +196,13 @@ class BacktestOrchestrator:
         name: str,
         signal_generator: Any,
         assets: List[str],
-        capital: float,
+        capital: Optional[float] = None,
+        capital_pct: Optional[float] = None,
         max_position_pct: Optional[float] = None,
         risk_per_trade: float = 0.02,
-        transaction_cost_bps: float = 3.0
+        transaction_cost_bps: float = 3.0,
+        position_sizer_type: str = 'fixed',
+        position_sizer_params: Optional[Dict[str, Any]] = None
     ) -> 'BacktestOrchestrator':
         """
         Add a strategy to the backtest.
@@ -208,10 +211,13 @@ class BacktestOrchestrator:
             name: Strategy name (e.g., 'Momentum_ES')
             signal_generator: Signal generator instance (e.g., MomentumSignalV2())
             assets: List of assets this strategy trades
-            capital: Initial capital for this strategy
+            capital: Initial capital for this strategy (absolute amount)
+            capital_pct: Capital as percentage of total_capital (alternative to capital)
             max_position_pct: Max position size per asset (default: 1/num_assets)
             risk_per_trade: Risk per trade as fraction (default: 0.02 = 2%)
             transaction_cost_bps: Transaction costs in basis points (default: 3)
+            position_sizer_type: Type of position sizer ('fixed', 'atr', 'volatility', 'kelly', 'futures')
+            position_sizer_params: Additional parameters for position sizer
         
         Returns:
             self (for method chaining)
@@ -224,6 +230,29 @@ class BacktestOrchestrator:
             if asset not in self.prices:
                 raise ValueError(f"Asset '{asset}' not found in loaded data. Available: {list(self.prices.keys())}")
         
+        # Handle capital allocation
+        if capital is not None and capital_pct is not None:
+            raise ValueError("Cannot specify both 'capital' and 'capital_pct'. Choose one.")
+        
+        if capital_pct is not None:
+            if self.total_capital == 0:
+                raise ValueError("Cannot use capital_pct without setting total_capital in config")
+            if not (0 < capital_pct <= 1.0):
+                raise ValueError(f"capital_pct must be between 0 and 1, got {capital_pct}")
+            
+            # Check total allocation
+            if self.allocated_capital + capital_pct > 1.0:
+                raise ValueError(
+                    f"Total capital allocation would exceed 100%: "
+                    f"{self.allocated_capital:.1%} + {capital_pct:.1%} = "
+                    f"{(self.allocated_capital + capital_pct):.1%}"
+                )
+            
+            capital = self.total_capital * capital_pct
+            self.allocated_capital += capital_pct
+        elif capital is None:
+            raise ValueError("Must specify either 'capital' or 'capital_pct'")
+        
         # Auto-calculate max position if not provided
         if max_position_pct is None:
             max_position_pct = 1.0 / len(assets) if len(assets) > 1 else 1.0
@@ -233,9 +262,12 @@ class BacktestOrchestrator:
             signal_generator=signal_generator,
             assets=assets,
             capital=capital,
+            capital_pct=capital_pct,
             max_position_pct=max_position_pct,
             risk_per_trade=risk_per_trade,
-            transaction_cost_bps=transaction_cost_bps
+            transaction_cost_bps=transaction_cost_bps,
+            position_sizer_type=position_sizer_type,
+            position_sizer_params=position_sizer_params or {}
         )
         
         self.strategies.append(config)
@@ -283,6 +315,58 @@ class BacktestOrchestrator:
         
         return self
     
+    def _create_position_sizer(self, strat: StrategyConfig):
+        """
+        Create position sizer based on strategy configuration.
+        
+        Args:
+            strat: Strategy configuration
+            
+        Returns:
+            PositionSizer instance
+        """
+        sizer_type = strat.position_sizer_type.lower()
+        params = strat.position_sizer_params or {}
+        
+        if sizer_type == 'futures' or self.use_futures_sizing:
+            return FuturesContractSizer(
+                contract_multipliers=self.contract_multipliers,
+                max_position_pct=strat.max_position_pct,
+                risk_per_trade=strat.risk_per_trade,
+                min_contracts=params.get('min_contracts', 1)
+            )
+        elif sizer_type == 'fixed':
+            return FixedFractionalSizer(
+                risk_per_trade=strat.risk_per_trade,
+                max_position_pct=strat.max_position_pct,
+                min_trade_value=params.get('min_trade_value', 100.0)
+            )
+        elif sizer_type == 'atr':
+            return ATRSizer(
+                risk_per_trade=strat.risk_per_trade,
+                atr_multiplier=params.get('atr_multiplier', 2.0),
+                max_position_pct=strat.max_position_pct,
+                min_trade_value=params.get('min_trade_value', 100.0)
+            )
+        elif sizer_type == 'volatility':
+            return VolatilityScaledSizer(
+                target_volatility=params.get('target_volatility', 0.15),
+                max_position_pct=strat.max_position_pct,
+                min_position_pct=params.get('min_position_pct', 0.05),
+                min_trade_value=params.get('min_trade_value', 100.0)
+            )
+        elif sizer_type == 'kelly':
+            return KellySizer(
+                max_position_pct=strat.max_position_pct,
+                kelly_fraction=params.get('kelly_fraction', 0.5),
+                min_trade_value=params.get('min_trade_value', 100.0)
+            )
+        else:
+            raise ValueError(
+                f"Unknown position_sizer_type: '{sizer_type}'. "
+                f"Valid options: 'fixed', 'atr', 'volatility', 'kelly', 'futures'"
+            )
+    
     def run_backtests(self, verbose: bool = True) -> Dict[str, Any]:
         """
         Run backtests for all strategies.
@@ -308,18 +392,7 @@ class BacktestOrchestrator:
             prices_dict = {asset: self.prices[asset] for asset in strat.assets}
             
             # Create position sizer
-            if self.use_futures_sizing:
-                position_sizer = FuturesContractSizer(
-                    contract_multipliers=self.contract_multipliers,
-                    max_position_pct=strat.max_position_pct,
-                    risk_per_trade=strat.risk_per_trade,
-                    min_contracts=1
-                )
-            else:
-                position_sizer = FixedFractionalSizer(
-                    risk_per_trade=strat.risk_per_trade,
-                    max_position_pct=strat.max_position_pct
-                )
+            position_sizer = self._create_position_sizer(strat)
             
             # Create portfolio manager
             pm = PortfolioManagerV2(
@@ -462,10 +535,254 @@ class BacktestOrchestrator:
             benchmark_equity = self.benchmark_data['Close']
         
         return PerformanceSummary(
-            strategy_equity=combined_equity,
-            benchmark_equity=benchmark_equity,
+            strategy_results=self.results,
+            benchmark_data=self.benchmark_data,
             benchmark_name=benchmark_name or self.benchmark_name
         )
+    
+    def split_train_test_data(self, oos_pct: Optional[float] = None, verbose: bool = True):
+        """
+        Split data into train/test sets for out-of-sample validation.
+        
+        Args:
+            oos_pct: Percentage for out-of-sample (e.g., 0.20 for 20%). Uses config if not provided.
+            verbose: Print split information
+        """
+        oos_pct = oos_pct or self.oos_split
+        if oos_pct == 0:
+            raise ValueError("oos_pct must be > 0. Set via oos_pct parameter or config['oos_split']")
+        
+        if not (0 < oos_pct < 1):
+            raise ValueError(f"oos_pct must be between 0 and 1, got {oos_pct}")
+        
+        if verbose:
+            print(f"\n📊 Splitting data: {(1-oos_pct)*100:.0f}% train, {oos_pct*100:.0f}% OOS")
+        
+        for ticker, df in self.prices.items():
+            split_idx = int(len(df) * (1 - oos_pct))
+            self.prices_train[ticker] = df.iloc[:split_idx].copy()
+            self.prices_test[ticker] = df.iloc[split_idx:].copy()
+            
+            if verbose:
+                print(f"  {ticker}: {len(self.prices_train[ticker])} train days, "
+                      f"{len(self.prices_test[ticker])} test days")
+                print(f"      Train: {self.prices_train[ticker].index[0].date()} to "
+                      f"{self.prices_train[ticker].index[-1].date()}")
+                print(f"      Test:  {self.prices_test[ticker].index[0].date()} to "
+                      f"{self.prices_test[ticker].index[-1].date()}")
+        
+        # Update main prices to train data
+        self.prices = self.prices_train.copy()
+        
+        if verbose:
+            print(f"✅ Data split complete. Use .prices for train, .prices_test for OOS")
+    
+    def run_oos_backtest(self, verbose: bool = True) -> Dict[str, Any]:
+        """
+        Run out-of-sample backtest on test data.
+        
+        Must call split_train_test_data() first.
+        
+        Args:
+            verbose: Print progress
+            
+        Returns:
+            Dictionary of strategy_name -> OOS BacktestResult
+        """
+        if not self.prices_test:
+            raise RuntimeError("Must call split_train_test_data() before running OOS backtest")
+        
+        if not self._signals_generated:
+            raise RuntimeError("Must generate signals on train data first. Call generate_signals()")
+        
+        if verbose:
+            print(f"\n🎯 Running OUT-OF-SAMPLE backtests...")
+        
+        # Temporarily swap prices to test set
+        original_prices = self.prices
+        self.prices = self.prices_test
+        
+        # Generate signals on OOS data
+        for strat in self.strategies:
+            if verbose:
+                print(f"\n  {strat.name} - Generating OOS signals...")
+            
+            strategy_signals = {}
+            for asset in strat.assets:
+                sig = strat.signal_generator.generate(self.prices_test[asset].copy())
+                strategy_signals[asset] = sig
+            
+            self.signals[strat.name] = strategy_signals
+        
+        # Run backtests on OOS data
+        for strat in self.strategies:
+            if verbose:
+                print(f"\n  {strat.name} (${strat.capital:,})...")
+            
+            signal_dict = self.signals[strat.name]
+            prices_dict = {asset: self.prices_test[asset] for asset in strat.assets}
+            
+            position_sizer = self._create_position_sizer(strat)
+            
+            pm = PortfolioManagerV2(
+                initial_capital=strat.capital,
+                risk_per_trade=strat.risk_per_trade,
+                max_position_size=strat.max_position_pct,
+                transaction_cost_bps=strat.transaction_cost_bps,
+                position_sizer=position_sizer
+            )
+            
+            result = pm.run_backtest(signals=signal_dict, prices=prices_dict)
+            
+            self.oos_results[strat.name] = {
+                'result': result,
+                'capital': strat.capital,
+                'assets': strat.assets
+            }
+            
+            if verbose:
+                print(f"    ✅ OOS Return: {result.total_return:.2%}")
+                print(f"    📊 OOS Sharpe: {result.metrics['Sharpe Ratio']:.2f}")
+                print(f"    📉 OOS Max DD: {result.metrics['Max Drawdown']:.2%}")
+        
+        # Restore original prices
+        self.prices = original_prices
+        self._oos_run = True
+        
+        if verbose:
+            print(f"\n✅ OOS backtests completed")
+        
+        return self.oos_results
+    
+    def run_walkforward(
+        self,
+        signal_class,
+        param_grid: Dict[str, List[Any]],
+        assets: List[str],
+        train_pct: float = 0.70,
+        test_pct: float = 0.15,
+        metric: str = 'sharpe',
+        initial_capital: float = 100000,
+        verbose: bool = True
+    ) -> WalkForwardOptimizer:
+        """
+        Run walk-forward optimization with parameter tuning.
+        
+        Args:
+            signal_class: Signal generator class (not instance)
+            param_grid: Dictionary of parameter names to lists of values
+            assets: List of assets to optimize (currently single-asset only)
+            train_pct: Training window percentage (default: 0.70 = 70%)
+            test_pct: Test window percentage (default: 0.15 = 15%)
+            metric: Optimization metric ('sharpe', 'return', 'risk_adjusted')
+            initial_capital: Starting capital for optimization
+            verbose: Print progress
+            
+        Returns:
+            WalkForwardOptimizer with results
+        """
+        if len(assets) != 1:
+            raise ValueError("Walk-forward optimization currently supports single asset only")
+        
+        asset = assets[0]
+        if asset not in self.prices:
+            raise ValueError(f"Asset '{asset}' not in loaded data")
+        
+        if verbose:
+            print(f"\n🔄 Starting walk-forward optimization for {asset}...")
+        
+        optimizer = WalkForwardOptimizer(
+            signal_class=signal_class,
+            param_grid=param_grid,
+            train_pct=train_pct,
+            test_pct=test_pct,
+            metric=metric,
+            verbose=verbose
+        )
+        
+        optimizer.optimize(
+            prices=self.prices[asset],
+            asset_name=asset,
+            initial_capital=initial_capital
+        )
+        
+        return optimizer
+    
+    def export_html_dashboard(
+        self,
+        output_dir: str = 'results/html',
+        filename_prefix: str = 'backtest',
+        include_oos: bool = False
+    ) -> str:
+        """
+        Export backtest results to HTML dashboard.
+        
+        Args:
+            output_dir: Output directory for HTML file
+            filename_prefix: Prefix for filename (default: 'backtest')
+            include_oos: Include OOS results if available
+            
+        Returns:
+            Path to generated HTML file
+        """
+        import os
+        from datetime import datetime as dt
+        
+        if not self._backtests_run:
+            raise RuntimeError("Must run backtests first. Call run_backtests()")
+        
+        # Create output directory if needed
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate filename with date
+        date_str = dt.now().strftime('%Y-%m-%d')
+        filename = f"{filename_prefix}_{date_str}.html"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Build HTML content
+        html_parts = []
+        html_parts.append("<html><head><style>")
+        html_parts.append("body { font-family: Arial, sans-serif; margin: 20px; }")
+        html_parts.append("h1 { color: #333; }")
+        html_parts.append("h2 { color: #666; }")
+        html_parts.append("table { border-collapse: collapse; margin: 20px 0; }")
+        html_parts.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }")
+        html_parts.append("th { background-color: #4CAF50; color: white; }")
+        html_parts.append("</style></head><body>")
+        html_parts.append(f"<h1>Backtest Results - {date_str}</h1>")
+        
+        # Add summary table
+        summary_df = self.get_summary()
+        html_parts.append("<h2>Strategy Performance</h2>")
+        html_parts.append(summary_df.to_html(index=False))
+        
+        # Add OOS results if requested
+        if include_oos and self._oos_run:
+            html_parts.append("\n<h2>Out-of-Sample Results</h2>")
+            
+            oos_data = []
+            for name, data in self.oos_results.items():
+                result = data['result']
+                oos_data.append({
+                    'Strategy': name,
+                    'OOS Return': f"{result.total_return:.2%}",
+                    'OOS Sharpe': f"{result.metrics['Sharpe Ratio']:.2f}",
+                    'OOS Max DD': f"{result.metrics['Max Drawdown']:.2%}",
+                    'OOS Trades': result.metrics['Total Trades']
+                })
+            
+            oos_df = pd.DataFrame(oos_data)
+            html_parts.append(oos_df.to_html(index=False))
+        
+        html_parts.append("</body></html>")
+        html_content = "\n".join(html_parts)
+        
+        # Write HTML file
+        with open(filepath, 'w') as f:
+            f.write(html_content)
+        
+        print(f"\n💾 HTML dashboard saved: {filepath}")
+        return filepath
     
     # Convenience methods for common workflows
     
