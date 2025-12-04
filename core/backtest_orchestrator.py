@@ -29,10 +29,17 @@ from datetime import datetime
 
 from core.multi_asset_loader import load_assets
 from core.portfolio.portfolio_manager_v2 import PortfolioManagerV2
-from core.portfolio.position_sizers import FixedFractionalSizer, FuturesContractSizer
+from core.portfolio.position_sizers import (
+    FixedFractionalSizer, 
+    FuturesContractSizer,
+    ATRSizer,
+    VolatilityScaledSizer,
+    KellySizer
+)
 from core.benchmark import BenchmarkLoader
 from utils.plotter import PortfolioPlotter
 from utils.formatter import PerformanceSummary
+from core.walk_forward_optimizer import WalkForwardOptimizer
 
 
 @dataclass
@@ -42,9 +49,12 @@ class StrategyConfig:
     signal_generator: Any  # SignalModel instance
     assets: List[str]
     capital: float
+    capital_pct: Optional[float] = None  # Alternative to absolute capital
     max_position_pct: Optional[float] = None
     risk_per_trade: float = 0.02
     transaction_cost_bps: float = 3.0
+    position_sizer_type: str = 'fixed'  # 'fixed', 'atr', 'volatility', 'kelly', 'futures'
+    position_sizer_params: Optional[Dict[str, Any]] = None  # Additional sizer parameters
 
 
 class BacktestOrchestrator:
@@ -56,6 +66,7 @@ class BacktestOrchestrator:
     
     def __init__(
         self,
+        config: Optional[Dict[str, Any]] = None,
         use_futures_sizing: bool = False,
         contract_multipliers: Optional[Dict[str, float]] = None
     ):
@@ -63,6 +74,12 @@ class BacktestOrchestrator:
         Initialize the orchestrator.
         
         Args:
+            config: Optional configuration dictionary with keys:
+                - assets: List[str] - Assets to load
+                - total_capital: float - Total portfolio capital
+                - oos_split: float - Out-of-sample split percentage (e.g., 0.20 for 20%)
+                - date_range: Tuple[str, str] - (start_date, end_date)
+                - use_futures_sizing: bool - Use futures contract sizing
             use_futures_sizing: If True, use FuturesContractSizer for integer contracts
             contract_multipliers: Dict of ticker -> multiplier (e.g., {'ES': 50, 'CL': 1000})
         """
@@ -73,14 +90,26 @@ class BacktestOrchestrator:
         self.benchmark_data: Optional[pd.DataFrame] = None
         self.benchmark_name: Optional[str] = None
         
+        # Configuration
+        self.config = config or {}
+        self.total_capital = self.config.get('total_capital', 0.0)
+        self.oos_split = self.config.get('oos_split', 0.0)
+        self.allocated_capital = 0.0  # Track allocated capital via capital_pct
+        
         # Futures contract sizing
-        self.use_futures_sizing = use_futures_sizing
+        self.use_futures_sizing = use_futures_sizing or self.config.get('use_futures_sizing', False)
         self.contract_multipliers = contract_multipliers or {}
+        
+        # OOS data storage
+        self.prices_train: Dict[str, pd.DataFrame] = {}
+        self.prices_test: Dict[str, pd.DataFrame] = {}
+        self.oos_results: Dict[str, Any] = {}
         
         # Track what's been run
         self._data_loaded = False
         self._signals_generated = False
         self._backtests_run = False
+        self._oos_run = False
     
     def load_data(
         self,
