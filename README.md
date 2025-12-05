@@ -625,6 +625,167 @@ All backtests include realistic costs:
 ### Chart Rendering
 Reports use `.tolist()` to serialize pandas data for Plotly, avoiding serialization bugs. Hard refresh browser (`Cmd+Shift+R`) if charts don't update.
 
+## 🎓 Development Guidelines
+
+This project follows strict coding standards for production-ready quantitative research. See `.clinerules` for complete guidelines.
+
+### Core Principles
+
+1. **Vectorized Operations**: No explicit loops in data processing
+   - ✅ Use pandas/numpy operations: `.shift()`, `.rolling()`, boolean masks
+   - ❌ Avoid: `for i in range(len(df))`, `.apply()`, `.iterrows()`
+
+2. **Type Safety**: Type hints on all function signatures
+   ```python
+   def generate(self, df: pd.DataFrame) -> pd.DataFrame:
+       """Generate signals with type-safe interface."""
+   ```
+
+3. **Input Validation**: Fail fast with clear error messages
+   ```python
+   if window < 2:
+       raise ValueError(f"window must be >= 2, got {window}")
+   ```
+
+4. **Test Coverage**: Minimum 80% for new code
+   - Unit tests for all signal generators
+   - Integration tests for workflows
+   - Edge case validation
+
+### Signal Development Pattern
+
+```python
+from signals.base import SignalModel
+import pandas as pd
+import numpy as np
+
+class MySignal(SignalModel):
+    """
+    Brief description of strategy logic.
+    
+    Attributes:
+        param1: Description
+        param2: Description
+    """
+    
+    def __init__(self, param1: int = 20, param2: float = 0.02):
+        """
+        Initialize signal with validation.
+        
+        Args:
+            param1: Parameter description
+            param2: Parameter description
+        
+        Raises:
+            ValueError: If parameters invalid
+        """
+        # Validate inputs (fail fast)
+        if param1 < 1:
+            raise ValueError(f"param1 must be >= 1, got {param1}")
+        
+        self.param1 = param1
+        self.param2 = param2
+    
+    def generate(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate signals using vectorized operations.
+        
+        Args:
+            df: DataFrame with 'Close' column
+        
+        Returns:
+            DataFrame with added 'Signal' column (1=long, -1=short, 0=flat)
+        
+        Raises:
+            ValueError: If df invalid
+        """
+        # Validate input
+        if df.empty:
+            raise ValueError("Input DataFrame is empty")
+        if 'Close' not in df.columns:
+            raise ValueError("DataFrame must have 'Close' column")
+        
+        df = df.copy()
+        
+        # VECTORIZED calculation (no loops!)
+        df['Signal'] = 0
+        
+        # Use boolean masks for conditions
+        long_condition = (df['Close'] > df['Close'].shift(self.param1))
+        df.loc[long_condition, 'Signal'] = 1
+        
+        # Forward fill to maintain positions
+        df['Signal'] = df['Signal'].replace(0, np.nan).ffill().fillna(0)
+        
+        return df
+```
+
+### Testing Pattern
+
+```python
+import pytest
+import pandas as pd
+import numpy as np
+
+class TestMySignal:
+    """Test suite for MySignal."""
+    
+    def test_initialization(self):
+        """Test signal can be initialized."""
+        signal = MySignal(param1=20, param2=0.02)
+        assert signal.param1 == 20
+        assert signal.param2 == 0.02
+    
+    def test_validation_param1_invalid(self):
+        """Test invalid param1 raises ValueError."""
+        with pytest.raises(ValueError, match="param1 must be >= 1"):
+            MySignal(param1=0)
+    
+    def test_generate_returns_dataframe(self, sample_data):
+        """Test generate() returns DataFrame."""
+        signal = MySignal()
+        result = signal.generate(sample_data)
+        assert isinstance(result, pd.DataFrame)
+    
+    def test_signals_are_valid_values(self, sample_data):
+        """Test signals are only -1, 0, or 1."""
+        signal = MySignal()
+        result = signal.generate(sample_data)
+        assert result['Signal'].isin([-1, 0, 1]).all()
+    
+    def test_empty_dataframe_raises_error(self):
+        """Test empty DataFrame raises ValueError."""
+        signal = MySignal()
+        with pytest.raises(ValueError, match="Input DataFrame is empty"):
+            signal.generate(pd.DataFrame())
+```
+
+### Performance Best Practices
+
+**DO:**
+- Use `.loc[]` for assignments: `df.loc[mask, 'col'] = value`
+- Use `.shift()` for previous values: `df['prev'] = df['Signal'].shift(1)`
+- Use boolean masks: `long_entry = (condition1) & (condition2)`
+- Use vectorized math: `returns = df['Close'].pct_change()`
+
+**DON'T:**
+- Use `.iloc[i]` in loops
+- Use `.apply()` when vectorized alternative exists
+- Use chained indexing: `df['A']['B']` (use `df.loc[:, 'A']`)
+- Hardcode magic numbers (use constants or parameters)
+
+### Git Workflow
+
+Conventional commits for clear history:
+```bash
+feat: Add new momentum signal with SMA filter
+fix: Correct position sizing calculation for futures
+test: Add comprehensive tests for mean reversion
+docs: Update README with signal examples
+refactor: Vectorize hybrid adaptive signal generator
+perf: Optimize rolling window calculations
+```
+
 ## 🤝 Contributing
 
 This is a personal research project demonstrating quantitative portfolio management and signal development skills. Not currently accepting external contributions.
