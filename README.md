@@ -1,7 +1,7 @@
 # QuantTrading
 
-[![Tests](https://github.com/Gadangadang/QuantTrading/actions/workflows/test.yml/badge.svg)](https://github.com/Gadangadang/QuantTrading/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/Gadangadang/QuantTrading/graph/badge.svg?token=O8O1H8OE9J)](https://codecov.io/gh/Gadangadang/QIS)
+[![Tests](https://github.com/Gadangadang/QIS/actions/workflows/test.yml/badge.svg)](https://github.com/Gadangadang/QIS/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Gadangadang/QIS/graph/badge.svg?token=O8O1H8OE9J)](https://codecov.io/gh/Gadangadang/QIS)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: Private](https://img.shields.io/badge/license-Private-red.svg)]()
