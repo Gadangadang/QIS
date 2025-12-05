@@ -1,4 +1,5 @@
 """Mean reversion trading signals for counter-trend strategies."""
+from typing import Optional
 import pandas as pd
 import numpy as np
 from signals.base import SignalModel
@@ -27,87 +28,113 @@ class MeanReversionSignal(SignalModel):
         >>> # Long when price drops 2σ below mean, exit when within 0.5σ of mean
     """
     
-    def __init__(self, window=20, entry_z=2.0, exit_z=0.5):
+    def __init__(self, window: int = 20, entry_z: float = 2.0, exit_z: float = 0.5):
         """
         Initialize mean reversion signal generator.
         
         Args:
-            window (int): Rolling window for mean and std calculation. Default 20.
-            entry_z (float): Z-score threshold for entry signal. Default 2.0.
-                           Entry triggers at ±entry_z standard deviations from mean.
-            exit_z (float): Z-score threshold for exit signal. Default 0.5.
-                          Exits when price reverts to within ±exit_z std of mean.
+            window: Rolling window for mean and std calculation (default: 20)
+            entry_z: Z-score threshold for entry signal (default: 2.0)
+                    Entry triggers at ±entry_z standard deviations from mean
+            exit_z: Z-score threshold for exit signal (default: 0.5)
+                   Exits when price reverts to within ±exit_z std of mean
+        
+        Raises:
+            ValueError: If window < 2, entry_z <= 0, exit_z < 0, or exit_z >= entry_z
         
         Note:
             Higher entry_z = fewer but stronger signals
             Lower exit_z = quicker exits (take profit sooner)
         """
+        # Validate parameters (fail fast)
+        if window < 2:
+            raise ValueError(f"window must be >= 2, got {window}")
+        if entry_z <= 0:
+            raise ValueError(f"entry_z must be positive, got {entry_z}")
+        if exit_z < 0:
+            raise ValueError(f"exit_z must be non-negative, got {exit_z}")
+        if exit_z >= entry_z:
+            raise ValueError(f"exit_z ({exit_z}) must be < entry_z ({entry_z})")
+        
         self.window = window
         self.entry_z = entry_z
         self.exit_z = exit_z
 
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Generate mean reversion signals for given price data.
+        Generate mean reversion signals using vectorized operations.
         
         Args:
-            df (pd.DataFrame): DataFrame with at least 'Close' column
+            df: DataFrame with at least 'Close' column
         
         Returns:
-            pd.DataFrame: Original DataFrame with added columns:
+            DataFrame with added columns:
                 - Z: Z-score of price relative to rolling mean/std
                 - Signal: Trading signal (1=long, -1=short, 0=flat)
         
+        Raises:
+            ValueError: If df is empty or missing 'Close' column
+        
         Logic:
-            - If flat and Z < -entry_z: Go long (oversold)
-            - If flat and Z > +entry_z: Go short (overbought)
-            - If long and Z > -exit_z: Exit (price reverted to mean)
-            - If short and Z < +exit_z: Exit (price reverted to mean)
-            - Stop loss: Exit if price moves further against position
+            Entry signals (when flat):
+            - Z < -entry_z: Go long (oversold)
+            - Z > +entry_z: Go short (overbought)
+            
+            Exit signals:
+            - Long: Exit when Z > -exit_z (reverted) or Z > entry_z (stop loss)
+            - Short: Exit when Z < exit_z (reverted) or Z < -entry_z (stop loss)
         
         Note:
-            First 'window' bars will have Position = 0 (insufficient data).
+            First 'window' bars will have Signal = 0 (insufficient data).
+            Uses forward fill to maintain positions between signals.
         """
+        # Validate input
+        if df.empty:
+            raise ValueError("Input DataFrame is empty")
+        if 'Close' not in df.columns:
+            raise ValueError("DataFrame must have 'Close' column")
+        
         df = df.copy()
         close = df["Close"]
+        
+        # Calculate z-score (vectorized)
         sma = close.rolling(self.window).mean()
         std = close.rolling(self.window).std()
         df["Z"] = (close - sma) / std
-
-        # Initialize signal column
-        df["Signal"] = 0
         
-        # Build positions bar-by-bar
-        for i in range(self.window, len(df)):
-            prev_signal = df.iloc[i - 1]["Signal"]
-            z_score = df.iloc[i]["Z"]
-            
-            # If flat, check for entry
-            if prev_signal == 0:
-                if z_score <= -self.entry_z:
-                    df.iloc[i, df.columns.get_loc("Signal")] = 1  # Long entry
-                elif z_score >= self.entry_z:
-                    df.iloc[i, df.columns.get_loc("Signal")] = -1  # Short entry
-                else:
-                    df.iloc[i, df.columns.get_loc("Signal")] = 0  # Stay flat
-            
-            # If holding long, check for exit
-            elif prev_signal == 1:
-                if z_score >= -self.exit_z:  # Mean reversion: exit when Z crosses back toward zero
-                    df.iloc[i, df.columns.get_loc("Signal")] = 0
-                elif z_score > self.entry_z:  # Stop loss: price moved against us
-                    df.iloc[i, df.columns.get_loc("Signal")] = 0
-                else:
-                    df.iloc[i, df.columns.get_loc("Signal")] = 1  # Hold
-            
-            # If holding short, check for exit
-            elif prev_signal == -1:
-                if z_score <= self.exit_z:  # Mean reversion: exit when Z crosses back toward zero
-                    df.iloc[i, df.columns.get_loc("Signal")] = 0
-                elif z_score < -self.entry_z:  # Stop loss: price moved against us
-                    df.iloc[i, df.columns.get_loc("Signal")] = 0
-                else:
-                    df.iloc[i, df.columns.get_loc("Signal")] = -1  # Hold
-
-        df["Signal"] = df["Signal"].astype(int)
+        # Entry conditions (vectorized)
+        long_entry = df["Z"] <= -self.entry_z  # Oversold
+        short_entry = df["Z"] >= self.entry_z  # Overbought
+        
+        # Exit conditions (vectorized)
+        long_exit_revert = df["Z"] >= -self.exit_z  # Mean reversion
+        long_exit_stop = df["Z"] > self.entry_z  # Stop loss
+        short_exit_revert = df["Z"] <= self.exit_z  # Mean reversion
+        short_exit_stop = df["Z"] < -self.entry_z  # Stop loss
+        
+        # Initialize signal with entry signals
+        df["Signal"] = 0
+        df.loc[long_entry, "Signal"] = 1
+        df.loc[short_entry, "Signal"] = -1
+        
+        # Forward fill to maintain positions
+        df["Signal"] = df["Signal"].replace(0, np.nan).ffill().fillna(0).astype(int)
+        
+        # Apply exit signals (vectorized)
+        # Exit long positions
+        long_mask = df["Signal"] == 1
+        exit_long = long_mask & (long_exit_revert | long_exit_stop)
+        df.loc[exit_long, "Signal"] = 0
+        
+        # Exit short positions  
+        short_mask = df["Signal"] == -1
+        exit_short = short_mask & (short_exit_revert | short_exit_stop)
+        df.loc[exit_short, "Signal"] = 0
+        
+        # Forward fill again after exits to prevent re-entry immediately
+        df["Signal"] = df["Signal"].replace(0, np.nan).ffill().fillna(0).astype(int)
+        
+        # Clear warmup period
+        df.iloc[:self.window, df.columns.get_loc("Signal")] = 0
+        
         return df

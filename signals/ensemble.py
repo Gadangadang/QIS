@@ -145,7 +145,7 @@ class EnsembleSignalNew(SignalModel):
         )
 
         # 3. Combine MR signals (majority vote)
-        df["MR_Sum"] = mr10["Position"] + mr20["Position"] + mr60["Position"]
+        df["MR_Sum"] = mr10["Signal"] + mr20["Signal"] + mr60["Signal"]
         df["MR_Vote"] = np.sign(df["MR_Sum"])  # -1, 0, or +1
 
         # 4. FINAL POSITION: only trade MR when in bull market
