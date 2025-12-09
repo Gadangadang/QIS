@@ -65,36 +65,38 @@ class BenchmarkLoader:
         Returns:
             DataFrame with Date index and TotalValue column (normalized)
         """
+        df = self._get_data(ticker, start_date, end_date)
+        return self._normalize_data(df, initial_value)
+
+    def _get_data(self, ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """Get data from cache or download it."""
         cache_file = self.cache_dir / f"{ticker}_benchmark.csv"
         
-        # Try to load from cache first
         if cache_file.exists():
-            df = pd.read_csv(cache_file, parse_dates=['Date'], index_col='Date')
-            
-            # Check if we need to update (cache doesn't cover requested date range)
-            start_ts = pd.Timestamp(start_date)
-            end_ts = pd.Timestamp(end_date)
-            
-            if len(df) == 0 or df.index.min() > start_ts or df.index.max() < end_ts:
-                print(f"📥 Updating {ticker} benchmark data...")
-                df = self._fetch_from_yfinance(ticker, start_date, end_date)
-                df.to_csv(cache_file)
-            else:
-                # Filter to requested date range
-                mask = (df.index >= start_date) & (df.index <= end_date)
-                df = df.loc[mask].copy()
-        else:
-            print(f"📥 Downloading {ticker} benchmark data...")
-            df = self._fetch_from_yfinance(ticker, start_date, end_date)
-            df.to_csv(cache_file)
-        
-        # Normalize to initial value (always create TotalValue after filtering)
-        if len(df) > 0 and 'TotalValue' not in df.columns:
-            df['TotalValue'] = (df['Close'] / df['Close'].iloc[0]) * initial_value
-        
-        # Ensure we have both columns
+            try:
+                df = pd.read_csv(cache_file, parse_dates=['Date'], index_col='Date')
+                start_ts = pd.Timestamp(start_date)
+                end_ts = pd.Timestamp(end_date)
+                
+                # Check if cache covers the requested range
+                if not df.empty and df.index.min() <= start_ts and df.index.max() >= end_ts:
+                    mask = (df.index >= start_date) & (df.index <= end_date)
+                    return df.loc[mask].copy()
+            except Exception as e:
+                print(f"⚠️ Error reading cache for {ticker}: {e}")
+
+        print(f"📥 Downloading {ticker} benchmark data...")
+        df = self._fetch_from_yfinance(ticker, start_date, end_date)
+        df.to_csv(cache_file)
+        return df
+
+    def _normalize_data(self, df: pd.DataFrame, initial_value: float) -> pd.DataFrame:
+        """Normalize data to initial value."""
+        if df.empty:
+            return pd.DataFrame(columns=['Close', 'TotalValue'])
+
         if 'TotalValue' not in df.columns:
-            df['TotalValue'] = initial_value
+            df['TotalValue'] = (df['Close'] / df['Close'].iloc[0]) * initial_value
             
         return df[['Close', 'TotalValue']]
     
@@ -194,6 +196,9 @@ class BenchmarkComparator:
         Returns:
             Dictionary with comparison metrics
         """
+        if portfolio_equity.empty or benchmark_equity.empty:
+            return {}
+
         # Calculate returns
         port_returns = portfolio_equity['TotalValue'].pct_change().dropna()
         bench_returns = benchmark_equity['TotalValue'].pct_change().dropna()
