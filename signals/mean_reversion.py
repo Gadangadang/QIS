@@ -131,8 +131,9 @@ class MeanReversionSignal(SignalModel):
         exit_short = short_mask & (short_exit_revert | short_exit_stop)
         df.loc[exit_short, "Signal"] = 0
         
-        # Forward fill again after exits to prevent re-entry immediately
-        df["Signal"] = df["Signal"].replace(0, np.nan).ffill().fillna(0).astype(int)
+        # NOTE: Do NOT forward fill after exits - that would override the exit signals!
+        # The exits are already applied, just ensure integer type
+        df["Signal"] = df["Signal"].fillna(0).astype(int)
         
         # Clear warmup period
         df.iloc[:self.window, df.columns.get_loc("Signal")] = 0

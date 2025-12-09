@@ -9,6 +9,8 @@ Responsibilities:
 
 from typing import Dict, Optional
 import pandas as pd
+from pathlib import Path
+from datetime import datetime
 
 from .portfolio import Portfolio
 from .risk_manager import RiskManager, RiskConfig
@@ -43,12 +45,13 @@ class PortfolioManagerV2:
         risk_per_trade: float = 0.02,
         max_position_size: float = 0.20,
         transaction_cost_bps: float = 3.0,
-        slippage_bps: float = 2.0,
-        stop_loss_pct: float = None,
-        take_profit_pct: float = None,
-        rebalance_threshold: float = None,
+        slippage_bps: float = 0.0,
+        stop_loss_pct: Optional[float] = None,
+        take_profit_pct: Optional[float] = None,
+        rebalance_threshold: Optional[float] = None,
         rebalance_frequency: str = 'never',
-        position_sizer: Optional[PositionSizer] = None
+        position_sizer: Optional[PositionSizer] = None,
+        risk_log_path: Optional[str] = None
     ):
         """
         Initialize portfolio manager with configuration.
@@ -95,6 +98,10 @@ class PortfolioManagerV2:
         
         self.risk_manager = RiskManager(self.risk_config, position_sizer=position_sizer)
         self.execution_engine = ExecutionEngine(self.execution_config)
+        
+        # Risk rejection logging
+        self.risk_log_path = risk_log_path
+        self.risk_rejections = []  # Store rejections in memory
     
     def run_backtest(
         self, 
@@ -188,6 +195,18 @@ class PortfolioManagerV2:
                         portfolio_value=portfolio.total_value
                     )
                     
+                    # Log if position sizing failed
+                    if shares <= 0:
+                        self._log_risk_rejection(
+                            date=date,
+                            ticker=ticker,
+                            signal=signal,
+                            price=price,
+                            reason='Position sizer returned 0 shares',
+                            portfolio_value=portfolio.total_value,
+                            cash=portfolio.cash
+                        )
+                    
                     # Check if trade is worth executing
                     if shares > 0 and self.execution_engine.should_execute(shares, price):
                         # Execute buy order
@@ -199,8 +218,17 @@ class PortfolioManagerV2:
                         try:
                             portfolio.open_position(ticker, shares, fill_price, date)
                             portfolio.cash -= cost
-                        except ValueError:
+                        except ValueError as e:
                             # Insufficient cash or other issue, skip
+                            self._log_risk_rejection(
+                                date=date,
+                                ticker=ticker,
+                                signal=signal,
+                                price=price,
+                                reason=f'Portfolio rejected: {str(e)}',
+                                portfolio_value=portfolio.total_value,
+                                cash=portfolio.cash
+                            )
                             pass
                 
                 # Exit logic: signal = 0 and we have position
@@ -238,6 +266,10 @@ class PortfolioManagerV2:
                 # Scale benchmark to match initial capital (maintaining DataFrame structure)
                 benchmark_equity = pd.DataFrame(index=benchmark_aligned.index)
                 benchmark_equity['TotalValue'] = benchmark_aligned['TotalValue'] * (self.initial_capital / 100.0)
+        
+        # Save risk rejection log if configured
+        if self.risk_log_path and self.risk_rejections:
+            self._save_risk_log()
             
         # Create and return BacktestResult
         return BacktestResult(
@@ -354,3 +386,41 @@ class PortfolioManagerV2:
             "="*60 + "\n"
         ]
         return '\n'.join(lines)
+    
+    def _log_risk_rejection(
+        self, 
+        date: pd.Timestamp, 
+        ticker: str, 
+        signal: float,
+        price: float,
+        reason: str,
+        portfolio_value: float,
+        cash: float
+    ):
+        """Log a rejected trade for later analysis."""
+        self.risk_rejections.append({
+            'Date': date,
+            'Ticker': ticker,
+            'Signal': signal,
+            'Price': price,
+            'Reason': reason,
+            'PortfolioValue': portfolio_value,
+            'Cash': cash
+        })
+    
+    def _save_risk_log(self):
+        """Save risk rejections to CSV file."""
+        if not self.risk_rejections:
+            return
+        
+        df = pd.DataFrame(self.risk_rejections)
+        
+        # Create directory if needed
+        log_path = Path(self.risk_log_path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save to CSV
+        df.to_csv(log_path, index=False)
+        print(f"\n📝 Risk rejection log saved: {log_path}")
+        print(f"   Total rejections: {len(df)}")
+        print(f"   Unique reasons: {df['Reason'].nunique()}")

@@ -394,13 +394,15 @@ class BacktestOrchestrator:
             # Create position sizer
             position_sizer = self._create_position_sizer(strat)
             
-            # Create portfolio manager
+            # Create portfolio manager with risk logging
+            risk_log_path = f"logs/risk_rejections_{strat.name}.csv"
             pm = PortfolioManagerV2(
                 initial_capital=strat.capital,
                 risk_per_trade=strat.risk_per_trade,
                 max_position_size=strat.max_position_pct,
                 transaction_cost_bps=strat.transaction_cost_bps,
-                position_sizer=position_sizer
+                position_sizer=position_sizer,
+                risk_log_path=risk_log_path
             )
             
             # Run backtest
@@ -626,12 +628,15 @@ class BacktestOrchestrator:
             
             position_sizer = self._create_position_sizer(strat)
             
+            # Create portfolio manager with risk logging for OOS
+            risk_log_path = f"logs/risk_rejections_{strat.name}_OOS.csv"
             pm = PortfolioManagerV2(
                 initial_capital=strat.capital,
                 risk_per_trade=strat.risk_per_trade,
                 max_position_size=strat.max_position_pct,
                 transaction_cost_bps=strat.transaction_cost_bps,
-                position_sizer=position_sizer
+                position_sizer=position_sizer,
+                risk_log_path=risk_log_path
             )
             
             result = pm.run_backtest(signals=signal_dict, prices=prices_dict)
@@ -785,6 +790,164 @@ class BacktestOrchestrator:
         
         print(f"\n💾 HTML dashboard saved: {filepath}")
         return filepath
+    
+    def generate_comprehensive_reports(
+        self,
+        output_dir: str = 'results/html',
+        benchmark_name: str = None,
+        title: str = None,
+        auto_open: bool = True
+    ) -> Dict[str, str]:
+        """
+        Generate comprehensive HTML reports with all visualizations using Reporter,
+        RiskDashboard, and MultiStrategyReporter classes.
+        
+        This method creates three types of reports:
+        1. Multi-Strategy Report: All equity curves, benchmark comparison, performance tables
+        2. Risk Dashboard: VaR, CVaR, drawdowns, correlations, rolling metrics
+        3. Individual Strategy Reports: Detailed analysis for each strategy
+        
+        Args:
+            output_dir: Output directory for HTML files (default: 'results/html')
+            benchmark_name: Name of benchmark for display (default: uses loaded benchmark name)
+            title: Title for multi-strategy report (default: auto-generated)
+            auto_open: Automatically open main report in browser (default: True)
+            
+        Returns:
+            Dictionary with paths to all generated reports:
+            {
+                'multi_strategy': path,
+                'risk_dashboard': path,
+                'individual': {strategy_name: path, ...}
+            }
+            
+        Raises:
+            RuntimeError: If backtests haven't been run yet
+            ImportError: If required reporter classes are not available
+        """
+        from datetime import datetime
+        from pathlib import Path
+        
+        if not self._backtests_run:
+            raise RuntimeError("Must run backtests first. Call run_backtests()")
+        
+        # Import reporter classes
+        try:
+            from core.reporter import Reporter
+            from core.risk_dashboard import RiskDashboard
+            from core.multi_strategy_reporter import MultiStrategyReporter
+        except ImportError as e:
+            raise ImportError(
+                f"Failed to import reporter classes: {e}. "
+                "Ensure Reporter, RiskDashboard, and MultiStrategyReporter are available."
+            )
+        
+        # Create output directory
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        print("📊 Generating comprehensive HTML reports...")
+        print("="*80)
+        
+        # Prepare combined equity curve
+        first_result = list(self.results.values())[0]['result']
+        dates = first_result.equity_curve.index
+        combined_equity_values = sum(
+            data['result'].equity_curve['TotalValue'].values 
+            for data in self.results.values()
+        )
+        combined_equity = pd.DataFrame({'TotalValue': combined_equity_values}, index=dates)
+        
+        # Prepare benchmark data (filter and re-normalize to match portfolio)
+        benchmark_filtered = None
+        bench_name = benchmark_name or self.benchmark_name or 'Benchmark'
+        
+        if self.benchmark_data is not None:
+            benchmark_filtered = self.benchmark_data.loc[dates[0]:dates[-1]].copy()
+            initial_capital = combined_equity['TotalValue'].iloc[0]
+            benchmark_filtered['TotalValue'] = (
+                benchmark_filtered['Close'] / benchmark_filtered['Close'].iloc[0]
+            ) * initial_capital
+            
+            print(f"\n📊 Data alignment:")
+            print(f"   Strategy period: {dates[0].strftime('%Y-%m-%d')} to {dates[-1].strftime('%Y-%m-%d')}")
+            print(f"   Portfolio initial capital: ${initial_capital:,.0f}")
+            print(f"   Combined equity: {len(combined_equity)} days")
+        
+        report_paths = {'individual': {}}
+        
+        # 1. Multi-Strategy Report
+        print("\n1️⃣  Generating Multi-Strategy Report...")
+        multi_reporter = MultiStrategyReporter()
+        report_title = title or f"Multi-Strategy Backtest Report ({datetime.now().strftime('%Y-%m-%d')})"
+        
+        multi_html = multi_reporter.generate_report(
+            strategy_results=self.results,
+            combined_equity=combined_equity,
+            benchmark_data=benchmark_filtered,
+            benchmark_name=bench_name,
+            title=report_title
+        )
+        
+        multi_report_path = output_path / f"multi_strategy_report_{datetime.now().strftime('%Y-%m-%d')}.html"
+        with open(multi_report_path, 'w') as f:
+            f.write(multi_html)
+        print(f"   ✅ Saved: {multi_report_path}")
+        report_paths['multi_strategy'] = str(multi_report_path)
+        
+        # 2. Risk Dashboard
+        print("\n2️⃣  Generating Risk Dashboard...")
+        risk_dashboard = RiskDashboard(output_dir=str(output_path))
+        
+        risk_html = risk_dashboard.generate_dashboard(
+            strategy_results=self.results,
+            combined_equity=combined_equity,
+            benchmark_data=benchmark_filtered,
+            benchmark_name=bench_name,
+            title=f"Risk Analysis Dashboard ({datetime.now().strftime('%Y-%m-%d')})"
+        )
+        
+        risk_report_path = output_path / f"risk_dashboard_{datetime.now().strftime('%Y-%m-%d')}.html"
+        with open(risk_report_path, 'w') as f:
+            f.write(risk_html)
+        print(f"   ✅ Saved: {risk_report_path}")
+        report_paths['risk_dashboard'] = str(risk_report_path)
+        
+        # 3. Individual Strategy Reports
+        print("\n3️⃣  Generating Individual Strategy Reports...")
+        reporter = Reporter(output_dir=str(output_path))
+        
+        for strategy_name, data in self.results.items():
+            result = data['result']
+            
+            report_html = reporter.generate_html_report(
+                equity_df=result.equity_curve,
+                trades_df=result.trades,
+                metrics=result.metrics,
+                title=f"{strategy_name} - Detailed Analysis",
+                benchmark_df=benchmark_filtered
+            )
+            
+            strategy_report_path = output_path / f"{strategy_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.html"
+            with open(strategy_report_path, 'w') as f:
+                f.write(report_html)
+            print(f"   ✅ {strategy_name}: {strategy_report_path}")
+            report_paths['individual'][strategy_name] = str(strategy_report_path)
+        
+        print("\n" + "="*80)
+        print(f"✅ All reports generated in: {output_path}")
+        print("\nReports include:")
+        print("   📈 Multi-Strategy Report: All equity curves, benchmark comparison, performance tables")
+        print("   ⚠️  Risk Dashboard: VaR, CVaR, drawdowns, correlations, rolling metrics")
+        print("   📊 Individual Reports: Detailed analysis for each strategy")
+        
+        # Auto-open main report in browser
+        if auto_open:
+            print("\nOpening multi-strategy report in browser...")
+            import webbrowser
+            webbrowser.open(f'file://{multi_report_path}')
+        
+        return report_paths
     
     # Convenience methods for common workflows
     

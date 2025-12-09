@@ -455,9 +455,11 @@ class MultiStrategyReporter:
         total_initial = sum(data['capital'] for data in strategy_results.values())
         portfolio_return = (combined_equity['TotalValue'].iloc[-1] / combined_equity['TotalValue'].iloc[0] - 1)
         
-        # Calculate portfolio Sharpe
+        # Calculate portfolio Sharpe (using 2% risk-free rate, consistent with BacktestResult)
         returns = combined_equity['TotalValue'].pct_change().dropna()
-        sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+        rf_rate = 0.02
+        excess_returns = returns - (rf_rate / 252)
+        sharpe = (np.sqrt(252) * excess_returns.mean() / returns.std()) if returns.std() > 0 else 0
         
         # Calculate max drawdown
         cumulative = combined_equity['TotalValue'] / combined_equity['TotalValue'].iloc[0]

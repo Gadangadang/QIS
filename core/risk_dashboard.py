@@ -378,8 +378,10 @@ class RiskDashboard:
         daily_vol = returns.std()
         annual_vol = daily_vol * np.sqrt(252)
         
-        # Sharpe & Sortino
-        sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+        # Sharpe & Sortino (using 2% risk-free rate)
+        rf_rate = 0.02
+        excess_returns = returns - (rf_rate / 252)
+        sharpe = (np.sqrt(252) * excess_returns.mean() / returns.std()) if returns.std() > 0 else 0
         downside_returns = returns[returns < 0]
         sortino = (returns.mean() / downside_returns.std() * np.sqrt(252)) if len(downside_returns) > 0 and downside_returns.std() > 0 else 0
         
@@ -653,10 +655,10 @@ class RiskDashboard:
             template='plotly_white'
         )
         
-        corr_html += f"""
+        corr_html += """
         <h3 style="margin-top: 30px;">Covariance Matrix</h3>
         <div class="chart-container">
-            <div id="covariance-chart-{int(__import__('time').time())}"></div>
+            <div id="covariance-chart"></div>
         </div>
         <p style="margin-top: 10px; color: #666;">
             <strong>Interpretation:</strong> Covariance measures how strategies move together. Higher values indicate greater joint variability.
@@ -706,14 +708,14 @@ class RiskDashboard:
         </p>
 """
         
-        corr_html += """
+        corr_html += f"""
     </div>
     <script>
         var corrData = {fig.to_json()};
         Plotly.newPlot('correlation-chart', corrData.data, corrData.layout, {{responsive: true}});
         
         var covData = {fig_cov.to_json()};
-        Plotly.newPlot('covariance-chart-{int(__import__('time').time())}', covData.data, covData.layout, {{responsive: true}});
+        Plotly.newPlot('covariance-chart', covData.data, covData.layout, {{responsive: true}});
     </script>
 """
         return corr_html
@@ -895,9 +897,11 @@ class RiskDashboard:
             equity = result.equity_curve['TotalValue']
             returns = equity.pct_change().dropna()
             
-            # Risk metrics
+            # Risk metrics (using 2% risk-free rate)
             annual_vol = returns.std() * np.sqrt(252)
-            sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+            rf_rate = 0.02
+            excess_returns = returns - (rf_rate / 252)
+            sharpe = (np.sqrt(252) * excess_returns.mean() / returns.std()) if returns.std() > 0 else 0
             
             downside_returns = returns[returns < 0]
             sortino = (returns.mean() / downside_returns.std() * np.sqrt(252)) if len(downside_returns) > 0 and downside_returns.std() > 0 else 0
