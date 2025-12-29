@@ -1,0 +1,51 @@
+# TAA Data Sources Configuration
+
+# Sector ETFs
+tickers:
+  sectors:
+    - 'XLK'  # Technology
+    - 'XLF'  # Financials
+    - 'XLV'  # Healthcare
+    - 'XLI'  # Industrials
+    - 'XLY'  # Consumer Discretionary
+    - 'XLP'  # Consumer Staples
+    - 'XLE'  # Energy
+    - 'XLU'  # Utilities
+    - 'XLB'  # Materials
+  
+  # Broad market
+  broad_market:
+    - 'SPY'  # S&P 500
+  
+  # Benchmark
+  benchmark: 'ACWI'  # MSCI All Country World Index
+
+# FRED macro indicators
+fred_series:
+  yield_curve: 'T10Y2Y'  # 10Y-2Y Treasury Spread
+  credit_spread: 'BAA10Y'  # BAA-10Y Spread
+  volatility: 'VIXCLS'  # VIX Closing Price
+  inflation: 'CPIAUCSL'  # Consumer Price Index
+
+# Date ranges
+dates:
+  start_date: '2010-01-01'
+  end_date: '2024-12-31'
+  
+  # Walk-forward validation
+  walk_forward_start: '2010-01-01'
+  first_oos_year: 2015
+  
+# Data storage
+storage:
+  format: 'parquet'
+  base_path: 'data/taa/'
+  
+  # Directories
+  features: 'data/taa/features/'
+  predictions: 'data/taa/predictions/'
+  portfolios: 'data/taa/portfolios/'
+  
+# Update frequency
+update_frequency: 'weekly'  # How often to rerun predictions
+rebalance_frequency: 'weekly'  # How often to rebalance portfolio
