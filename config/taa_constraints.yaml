@@ -7,7 +7,7 @@ portfolio:
   sum_to_one: true  # Weights must sum to 1
   
   # Position limits
-  max_position: 0.33  # Maximum 33% in single sector
+  max_position: 0.40  # Maximum 40% in single sector (increased from 33%)
   min_position: 0.0   # Minimum position (0 = can exclude sectors)
   
   # Cash position
@@ -17,7 +17,7 @@ portfolio:
 # Tracking error constraints
 tracking_error:
   enabled: true
-  max_te: 0.08  # Maximum 8% annualized tracking error vs benchmark
+  max_te: 0.12  # Maximum 12% annualized tracking error vs benchmark (increased from 8%)
   benchmark_ticker: 'ACWI'  # MSCI All Country World Index
   
   # Benchmark sector weights (approximate ACWI sector allocation)
@@ -46,12 +46,14 @@ transaction_costs:
 
 # Turnover constraints
 turnover:
-  max_monthly: 0.50  # Maximum 50% monthly turnover
+  max_monthly: 0.25  # Maximum 25% per rebalance (weekly) ≈ 100% monthly (increased from 12%)
   penalize: true
-  penalty_lambda: 0.001  # Penalty coefficient for turnover
+  penalty_lambda: 0.0005  # Reduced penalty (was 0.001) to allow more trading
+  # Note: With weekly rebalancing, max_monthly actually means max per week
+  # 0.25 per week * 4.33 weeks/month ≈ 100% monthly turnover  # Penalty coefficient for turnover
 
 # Risk aversion
-risk_aversion: 2.0  # Lambda in objective: maximize(expected_return - lambda * variance)
+risk_aversion: 1.0  # Lambda in objective: maximize(expected_return - lambda * variance) - reduced from 2.0
 
 # Optimization solver
 solver:
