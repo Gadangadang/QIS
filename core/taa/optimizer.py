@@ -874,6 +874,9 @@ class TAAOptimizer:
         # Initialize the specific optimizer
         self.optimizer = optimizer_class(constraints, **optimizer_kwargs)
         
+        # Expose constraints for testing/inspection
+        self.constraints = constraints
+        
         logger.info(f"TAAOptimizer initialized with method='{method}'")
     
     def optimize(
