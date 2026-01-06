@@ -200,6 +200,70 @@ Risk = Factor_Risk + Specific_Risk
 - Economic theory-based factors (Fama-French, Carhart)
 - Hybrid approach combining both
 
+#### C. Advanced Covariance Methods (de Prado Framework)
+
+**Context:** Traditional covariance estimation suffers from noise, non-linear dependencies, and non-stationarity. The methods below address these limitations systematically.
+
+**1. Random Matrix Theory (RMT) Denoising** ⭐ **HIGH PRIORITY**
+- **Reference:** *Advances in Financial Machine Learning*, Chapter 2
+- **Problem:** Sample covariance eigenvalues contain noise when T/N is small
+- **Solution:** Marcenko-Pastur distribution identifies noise band
+- **Process:**
+  1. Compute eigenvalues of sample covariance
+  2. Identify noise band using Marcenko-Pastur bounds
+  3. Set noisy eigenvalues to zero or shrink them
+  4. Reconstruct denoised covariance matrix
+- **Impact:** More stable out-of-sample performance
+- **Implementation:** Custom (de Prado code) or sklearn-portfolio library
+- **Timeline:** Week 2-3 (after Ledoit-Wolf baseline)
+
+**2. Hierarchical Risk Parity (HRP)** ✅ **ALREADY IMPLEMENTED**
+- **Reference:** *Advances in Financial Machine Learning*, Chapter 16
+- **Problem:** Matrix inversion amplifies estimation errors
+- **Solution:** Use distance metrics (no inversion needed)
+- **Advantages:**
+  - Captures non-linear relationships through clustering
+  - Robust to multicollinearity
+  - No optimization required
+- **Current Status:** Available as `HRPOptimizer` in our factory
+- **Usage:** Run comparison vs. mean-variance to validate robustness
+
+**3. Detonation (Market Component Removal)**
+- **Reference:** *Advances in Financial Machine Learning*, Chapter 2
+- **Purpose:** Remove dominant market factor to focus on idiosyncratic risks
+- **Application:** Better for long-short strategies
+- **TAA Relevance:** LOW (we want market exposure)
+- **Timeline:** Phase 3 / Optional
+
+**4. Non-Linear Dependence Measures**
+- **Distance Correlation:** Captures non-linear relationships
+- **Mutual Information:** Information theory-based dependence
+- **Vine Copulas:** Tail dependence and asymmetric correlations
+- **Computational Cost:** HIGH
+- **TAA Relevance:** MEDIUM (useful for commodities, crypto)
+- **Timeline:** Phase 3 (Month 2+)
+
+**Implementation Priority for TAA:**
+```
+Phase 1 (Week 1-2):
+├── 1. Ledoit-Wolf Shrinkage (baseline, fast, proven)
+├── 2. EWMA (time-varying, regime-aware)
+└── 3. HRP comparison (already have it, robustness check)
+
+Phase 2 (Week 2-3):
+├── 4. RMT Denoising (de Prado - highest ROI)
+└── 5. DCC-GARCH (if time permits)
+
+Phase 3 (Month 2+):
+└── 6. Copulas/Distance Correlation (advanced, optional)
+```
+
+**Recommended Hybrid Approach:**
+1. **Base Estimator:** Ledoit-Wolf for stability
+2. **Regime Layer:** EWMA in high-volatility periods (VIX > 25)
+3. **Validation:** HRP as sanity check (should produce similar allocations)
+4. **Enhancement:** RMT denoising for production (after validation)
+
 #### C. Regime-Dependent Covariance
 
 **1. Hidden Markov Models (HMM)**
