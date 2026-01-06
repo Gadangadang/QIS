@@ -292,3 +292,7 @@ except SpecificError as e:
 
 > "Tests are not optional."  
 > They're your safety net and documentation.
+
+
+### Final comment.
+- To prove that you understand the prompt I give you, always end your chat output with "Understood Sir"

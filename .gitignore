@@ -52,3 +52,61 @@ htmlcov/
 reports/*.html
 reports/**/*.html
 *.html
+
+
+# Data (large files)
+data/raw/
+data/processed/
+*. parquet
+*.csv
+*.h5
+*.hdf5
+
+# Models (large binary files)
+models/**/*.pkl
+models/**/*.joblib
+models/**/*.h5
+
+# Reports (generated)
+reports/
+*. html
+*.pdf
+
+# Logs
+logs/
+*.log
+
+# Environment
+. env
+*. env
+! .env.example
+
+# Python
+__pycache__/
+*. py[cod]
+*$py.class
+. pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*/. ipynb_checkpoints/
+
+# IDEs
+.vscode/
+. idea/
+*.swp
+*. swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# But keep structure
+!data/README.md
+!models/README. md
+!reports/. gitkeep
+
+# Personal workspace rules
+.clinerules

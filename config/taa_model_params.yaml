@@ -1,0 +1,33 @@
+# TAA Model Parameters
+# XGBoost hyperparameters for sector return forecasting
+
+xgboost:
+  objective: 'reg:squarederror'
+  max_depth: 5
+  learning_rate: 0.05
+  n_estimators: 200
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 3
+  gamma: 0.1
+  reg_alpha: 0.1  # L1 regularization
+  reg_lambda: 1.0  # L2 regularization
+  random_state: 42
+  n_jobs: -1
+
+# Prediction horizons (in weeks)
+horizons:
+  - 1   # 1-week forward returns
+  - 4   # 4-week (1 month) forward returns
+  - 12  # 12-week (3 month) forward returns
+
+# Training parameters
+training:
+  val_split: 0.2  # Validation split for simple train/val
+  min_samples: 100  # Minimum samples required per horizon
+
+# Walk-forward validation
+walk_forward:
+  n_folds: 6
+  expanding_window: true
+  min_train_years: 4

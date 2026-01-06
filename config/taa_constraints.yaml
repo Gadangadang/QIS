@@ -1,0 +1,62 @@
+# TAA Portfolio Optimization Constraints
+# Mean-variance optimization parameters
+
+# Portfolio constraints
+portfolio:
+  long_only: true  # No shorting allowed
+  sum_to_one: true  # Weights must sum to 1
+  
+  # Position limits
+  max_position: 0.40  # Maximum 40% in single sector (increased from 33%)
+  min_position: 0.0   # Minimum position (0 = can exclude sectors)
+  
+  # Cash position
+  allow_cash: true
+  max_cash: 0.1  # Maximum 20% cash
+
+# Tracking error constraints
+tracking_error:
+  enabled: true
+  max_te: 0.12  # Maximum 12% annualized tracking error vs benchmark (increased from 8%)
+  benchmark_ticker: 'ACWI'  # MSCI All Country World Index
+  
+  # Benchmark sector weights (approximate ACWI sector allocation)
+  # Note: These are approximations, should ideally use actual ACWI constituent weights
+  benchmark_weights:
+    XLK: 0.22  # Technology
+    XLF: 0.14  # Financials
+    XLV: 0.13  # Healthcare
+    XLI: 0.11  # Industrials
+    XLY: 0.10  # Consumer Discretionary
+    XLP: 0.08  # Consumer Staples
+    XLE: 0.05  # Energy
+    XLU: 0.03  # Utilities
+    SPY: 0.14  # Broad market (catch-all for unclassified)
+
+# Transaction costs
+transaction_costs:
+  commission_bps: 5  # 5 basis points per trade
+  slippage_bps: 3    # 3 basis points market impact
+  
+  # Volatility adjustment
+  vix_adjustment:
+    enabled: true
+    threshold: 30  # VIX level above which costs increase
+    multiplier: 1.5  # Cost multiplier when VIX > threshold
+
+# Turnover constraints
+turnover:
+  max_monthly: 0.25  # Maximum 25% per rebalance (weekly) ≈ 100% monthly (increased from 12%)
+  penalize: true
+  penalty_lambda: 0.0005  # Reduced penalty (was 0.001) to allow more trading
+  # Note: With weekly rebalancing, max_monthly actually means max per week
+  # 0.25 per week * 4.33 weeks/month ≈ 100% monthly turnover  # Penalty coefficient for turnover
+
+# Risk aversion
+risk_aversion: 1.0  # Lambda in objective: maximize(expected_return - lambda * variance) - reduced from 2.0
+
+# Optimization solver
+solver:
+  name: 'ECOS'  # cvxpy solver (ECOS, SCS, OSQP)
+  max_iters: 1000
+  verbose: false

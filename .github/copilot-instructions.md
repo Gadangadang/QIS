@@ -9,6 +9,7 @@
 - Vectorized pandas/numpy operations (never loop)
 - Type hints + Google-style docstrings
 - Configuration over hardcoding
+- **Classes belong in modules, not notebooks** (notebooks should import from `core/`)
 
 ## Architecture Overview
 
@@ -88,6 +89,22 @@ class MySignal(SignalModel):
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()  # Critical: never modify input
         
+**Notebook Best Practices:**
+- Notebooks are for **analysis, visualization, and experimentation**
+- **Never define classes in notebooks** - import from `core/` modules
+- Keep notebooks clean: cells should be 10-30 lines max
+- Use markdown cells to explain each section
+- Include section numbers (## 1. Load Data, ## 2. Run Backtest, etc.)
+- Print progress messages for long-running operations
+- Save results to `data/` or `results/` directories at the end
+
+**Class Organization:**
+- Signal generators → `signals/`
+- Portfolio optimizers → `core/taa/optimizer.py` or `core/portfolio/`
+- Data collectors → `core/data/collectors/`
+- Utilities → `utils/`
+- Tests → `tests/`
+
 **Vectorization (Performance Critical - See mastercoder.instructions.md):**
 - **Never** loop through DataFrames with `.loc[i]` or `for i in range(len(df))`
 - Use `.rolling()`, `.expanding()`, `.shift()` for time-series ops
