@@ -1,5 +1,5 @@
 """
-Additional simple tests to push coverage over 60%.
+Additional simple tests to improve coverage to 56%.
 
 Focused on easy-to-test utility functions and edge cases.
 """
