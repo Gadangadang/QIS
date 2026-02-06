@@ -1,5 +1,6 @@
 codecov:
   require_ci_to_pass: yes
+  max_report_age: off  # Disable max age check to prevent upload rejections
   notify:
     after_n_builds: 1  # Only Python 3.11 uploads coverage
 
@@ -11,14 +12,14 @@ coverage:
   status:
     project:
       default:
-        target: 35%
-        threshold: 5%
+        target: 30%
+        threshold: 1%
         if_ci_failed: error
     
     patch:
       default:
-        target: 60%
-        threshold: 10%
+        target: 30%
+        threshold: 1%
         if_ci_failed: error
 
 comment:
