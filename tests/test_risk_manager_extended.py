@@ -15,7 +15,6 @@ import pandas as pd
 import numpy as np
 from datetime import date, timedelta
 from core.portfolio.risk_manager import RiskManager, RiskConfig
-from core.portfolio.position_sizers import FixedFractionalSizer
 from core.portfolio.portfolio import Position
 
 
