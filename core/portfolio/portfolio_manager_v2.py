@@ -261,7 +261,7 @@ class PortfolioManagerV2:
         benchmark_equity = None
         if benchmark_data is not None and len(equity_curve) > 0:
             # Align benchmark to portfolio dates
-            benchmark_aligned = benchmark_data.reindex(equity_curve.index, method='ffill')
+            benchmark_aligned = benchmark_data.reindex(equity_curve.index).ffill()
             if 'TotalValue' in benchmark_aligned.columns:
                 # Scale benchmark to match initial capital (maintaining DataFrame structure)
                 benchmark_equity = pd.DataFrame(index=benchmark_aligned.index)

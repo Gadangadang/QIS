@@ -13,7 +13,6 @@ __pycache__/
 # Jupyter Notebook
 .ipynb_checkpoints/
 *.ipynb_checkpoints
-archive/archive/
 
 # Logs and test outputs
 logs/
@@ -47,17 +46,17 @@ ROADMAP.md
 # Test coverage
 .coverage
 htmlcov/
+coverage.xml
 
 # Reports (generated HTML files)
-reports/*.html
-reports/**/*.html
+reports/
 *.html
-
+*.pdf
 
 # Data (large files)
 data/raw/
 data/processed/
-*. parquet
+*.parquet
 *.csv
 *.h5
 *.hdf5
@@ -67,46 +66,26 @@ models/**/*.pkl
 models/**/*.joblib
 models/**/*.h5
 
-# Reports (generated)
-reports/
-*. html
-*.pdf
-
-# Logs
-logs/
-*.log
-
 # Environment
-. env
-*. env
-! .env.example
+.env
+*.env
+!.env.example
 
 # Python
-__pycache__/
-*. py[cod]
+*.py[cod]
 *$py.class
-. pytest_cache/
-.coverage
-htmlcov/
 
-# Jupyter
-.ipynb_checkpoints/
-*/. ipynb_checkpoints/
+# Backup / old files
+*.backup
+*.old
 
-# IDEs
-.vscode/
-. idea/
-*.swp
-*. swo
-
-# OS
-.DS_Store
-Thumbs.db
+# Archive of old documentation
+readmes/archive/
 
 # But keep structure
 !data/README.md
-!models/README. md
-!reports/. gitkeep
+!models/README.md
+!reports/.gitkeep
 
 # Personal workspace rules
 .clinerules

@@ -91,7 +91,7 @@ class PerformanceSummary:
     
     def _calculate_benchmark_metrics(self):
         """Calculate benchmark metrics."""
-        bench_prices = self.benchmark_data['Close'].reindex(self.dates, method='ffill')
+        bench_prices = self.benchmark_data['Close'].reindex(self.dates).ffill()
         
         # Buy-and-hold equity
         initial_value = self.total_capital

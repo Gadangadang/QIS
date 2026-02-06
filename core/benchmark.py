@@ -156,7 +156,7 @@ class BenchmarkLoader:
             benchmark_df.index = pd.to_datetime(benchmark_df.index)
         
         # Reindex benchmark to portfolio dates, forward fill missing values
-        aligned = benchmark_df.reindex(portfolio_equity.index, method='ffill')
+        aligned = benchmark_df.reindex(portfolio_equity.index).ffill()
         
         # Renormalize to match portfolio starting value
         if len(aligned) > 0 and len(portfolio_equity) > 0:

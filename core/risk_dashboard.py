@@ -163,7 +163,7 @@ class RiskDashboard:
         
         # Sum across strategies to get total portfolio value
         if combined_equity is not None:
-            combined_equity = combined_equity.fillna(method='ffill').fillna(0)
+            combined_equity = combined_equity.ffill().fillna(0)
             combined_equity['TotalValue'] = combined_equity.sum(axis=1)
             combined_equity = combined_equity[['TotalValue']]
         else:

@@ -665,7 +665,7 @@ class Reporter:
         
         for strategy_name, result in results.items():
             # Get strategy equity curve
-            strategy_equity = result.equity_curve['TotalValue'].reindex(all_dates, method='ffill')
+            strategy_equity = result.equity_curve['TotalValue'].reindex(all_dates).ffill()
             strategy_equity = strategy_equity.fillna(result.initial_capital)
             
             # Calculate P&L: current value - initial capital
@@ -692,7 +692,7 @@ class Reporter:
         # Calculate benchmark metrics if provided
         benchmark_metrics = {}
         if benchmark_equity is not None and len(benchmark_equity) > 0:
-            bench_aligned = benchmark_equity.reindex(portfolio_equity.index, method='ffill').fillna(method='bfill')
+            bench_aligned = benchmark_equity.reindex(portfolio_equity.index).ffill().bfill()
             if 'TotalValue' in bench_aligned.columns:
                 bench_returns = bench_aligned['TotalValue'].pct_change().dropna()
                 benchmark_total_return = (bench_aligned['TotalValue'].iloc[-1] / bench_aligned['TotalValue'].iloc[0] - 1)
