@@ -14,7 +14,6 @@ import numpy as np
 from signals.ensemble import AdaptiveEnsemble, EnsembleSignal, EnsembleSignalNew
 from signals.momentum import MomentumSignalV2
 from signals.mean_reversion import MeanReversionSignal
-from signals.trend_following_long_short import TrendFollowingLongShort
 
 
 @pytest.fixture

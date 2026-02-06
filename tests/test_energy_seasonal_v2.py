@@ -132,6 +132,7 @@ class TestEnergySeasonalBalancedSignalGeneration:
         result = signal.generate(energy_price_data)
         
         assert result['Signal'].isin([-1, 0, 1]).all()
+        assert result['Signal'].dtype in [np.int64, np.int32, int]
     
     def test_volatility_regime_detection(self, energy_price_data):
         """Test that volatility regime is properly detected."""
@@ -141,9 +142,11 @@ class TestEnergySeasonalBalancedSignalGeneration:
         # HighVol should be binary
         assert result['HighVol'].isin([0, 1]).all()
         
-        # Should have some high vol periods
-        high_vol_count = result['HighVol'].sum()
-        total_count = result['HighVol'].notna().sum()
+        # Should have some high vol periods (exclude warm-up period)
+        warm_up = 60  # Based on vol_window default
+        valid_data = result['HighVol'].iloc[warm_up:]
+        high_vol_count = valid_data.sum()
+        total_count = len(valid_data)
         high_vol_pct = high_vol_count / total_count if total_count > 0 else 0
         
         # With 75th percentile threshold, roughly 25% should be high vol
@@ -384,6 +387,7 @@ class TestEnergySeasonalComparison:
         # Note: Aggressive uses HIGHER vol threshold (0.90) to ignore vol except in extremes
         # Balanced uses lower threshold (0.75) to be more conservative
         # This is intentional - aggressive only stops in extreme vol
+        # Higher percentile = less vol-sensitive (only triggers on extreme volatility)
         assert aggressive.vol_percentile_threshold > balanced.vol_percentile_threshold
         
         # Aggressive should have faster MR
