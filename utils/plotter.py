@@ -228,7 +228,7 @@ class PortfolioPlotter:
             title = 'Monthly Returns Heatmap - Combined Portfolio'
         
         # Create monthly returns table
-        monthly_returns = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
+        monthly_returns = returns.resample('ME').apply(lambda x: (1 + x).prod() - 1)
         monthly_returns = monthly_returns.to_frame()
         monthly_returns['Year'] = monthly_returns.index.year
         monthly_returns['Month'] = monthly_returns.index.month
@@ -371,7 +371,7 @@ class PortfolioPlotter:
         axes[1].grid(True, alpha=0.3)
         
         # 3. Monthly returns heatmap (simplified)
-        monthly_returns = self.combined_returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
+        monthly_returns = self.combined_returns.resample('ME').apply(lambda x: (1 + x).prod() - 1)
         monthly_data = pd.DataFrame({
             'Year': monthly_returns.index.year,
             'Month': monthly_returns.index.month,

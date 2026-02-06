@@ -456,17 +456,25 @@ class Reporter:
     def _calculate_monthly_returns(self, returns: pd.Series) -> Optional[pd.DataFrame]:
         """Calculate monthly returns as a pivot table (years x months)."""
         try:
-            monthly = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
+            monthly = returns.resample('ME').apply(lambda x: (1 + x).prod() - 1)
             monthly_pivot = pd.DataFrame({
                 'Year': monthly.index.year,
                 'Month': monthly.index.month,
                 'Return': monthly.values
             })
             pivot = monthly_pivot.pivot(index='Year', columns='Month', values='Return')
+            
+            # Reindex to ensure all 12 months exist (fill missing with NaN)
+            pivot = pivot.reindex(columns=range(1, 13))
+            
+            # Now assign month names safely
             pivot.columns = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
             return pivot
-        except:
+        except Exception as e:
+            # Log the error for debugging instead of silently returning None
+            import warnings
+            warnings.warn(f"Error calculating monthly returns: {e}")
             return None
     
     def _metrics_to_html(self, metrics: Dict) -> str:
@@ -1274,7 +1282,7 @@ class Reporter:
                 # Calculate monthly returns
                 equity = result.equity_curve['TotalValue'].copy()
                 equity.index = pd.to_datetime(equity.index)
-                monthly_returns = equity.resample('M').last().pct_change() * 100
+                monthly_returns = equity.resample('ME').last().pct_change() * 100
                 
                 # Create pivot table for heatmap
                 monthly_returns_df = pd.DataFrame({
