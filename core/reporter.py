@@ -13,6 +13,7 @@ Features:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import warnings
 from typing import Dict, Optional, List, Tuple
 from pathlib import Path
 from datetime import datetime
@@ -473,7 +474,6 @@ class Reporter:
             return pivot
         except Exception as e:
             # Log the error for debugging instead of silently returning None
-            import warnings
             warnings.warn(f"Error calculating monthly returns: {e}")
             return None
     
