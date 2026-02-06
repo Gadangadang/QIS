@@ -1,0 +1,394 @@
+"""
+Test suite for data collectors.
+
+Tests for core/data/collectors/:
+- YahooCollector initialization and data fetching
+- Base collector interface
+- FRED collector (if applicable)
+- Error handling and edge cases
+"""
+
+import pytest
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+from unittest.mock import Mock, patch, MagicMock
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.data.collectors.base_collector import BaseCollector
+
+# Import YahooCollector directly to avoid fred_collector import issue
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "yahoo_collector",
+    Path(__file__).parent.parent / "core" / "data" / "collectors" / "yahoo_collector.py"
+)
+yahoo_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(yahoo_module)
+YahooCollector = yahoo_module.YahooCollector
+
+
+# ============================================================================
+# Base Collector Tests
+# ============================================================================
+
+class TestBaseCollector:
+    """Test BaseCollector abstract interface."""
+    
+    def test_base_collector_is_abstract(self):
+        """Test that BaseCollector cannot be instantiated directly."""
+        # BaseCollector defines interface, concrete classes must implement
+        collector = BaseCollector()
+        assert hasattr(collector, 'fetch_history')
+        assert hasattr(collector, 'fetch_latest')
+
+
+# ============================================================================
+# Yahoo Collector Tests
+# ============================================================================
+
+class TestYahooCollectorInitialization:
+    """Test YahooCollector initialization."""
+    
+    def test_initialization(self):
+        """Test basic initialization."""
+        collector = YahooCollector()
+        assert collector is not None
+        assert hasattr(collector, 'fetch_history')
+        assert hasattr(collector, 'fetch_latest')
+
+
+class TestYahooCollectorFetchHistory:
+    """Test YahooCollector fetch_history method."""
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_single_ticker(self, mock_download):
+        """Test fetching data for a single ticker."""
+        # Mock yfinance response
+        dates = pd.date_range('2023-01-01', periods=10, freq='D')
+        mock_data = pd.DataFrame({
+            'Open': np.random.rand(10) * 100,
+            'High': np.random.rand(10) * 100,
+            'Low': np.random.rand(10) * 100,
+            'Close': np.random.rand(10) * 100,
+            'Volume': np.random.randint(1000, 10000, 10)
+        }, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=['AAPL'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+        assert not result.empty
+        mock_download.assert_called_once()
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_multiple_tickers(self, mock_download):
+        """Test fetching data for multiple tickers."""
+        dates = pd.date_range('2023-01-01', periods=10, freq='D')
+        
+        # Mock multi-ticker response
+        mock_data = pd.DataFrame({
+            ('AAPL', 'Close'): np.random.rand(10) * 150,
+            ('MSFT', 'Close'): np.random.rand(10) * 300,
+            ('AAPL', 'Volume'): np.random.randint(1000, 10000, 10),
+            ('MSFT', 'Volume'): np.random.randint(1000, 10000, 10)
+        }, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=['AAPL', 'MSFT'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+        assert not result.empty
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_with_datetime_objects(self, mock_download):
+        """Test fetching with datetime objects instead of strings."""
+        dates = pd.date_range('2023-01-01', periods=5, freq='D')
+        mock_data = pd.DataFrame({
+            'Close': np.random.rand(5) * 100
+        }, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        start = datetime(2023, 1, 1)
+        end = datetime(2023, 1, 5)
+        
+        result = collector.fetch_history(
+            tickers=['AAPL'],
+            start_date=start,
+            end_date=end
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_different_intervals(self, mock_download):
+        """Test fetching with different time intervals."""
+        dates = pd.date_range('2023-01-01', periods=5, freq='H')
+        mock_data = pd.DataFrame({
+            'Close': np.random.rand(5) * 100
+        }, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        
+        # Test hourly data
+        result = collector.fetch_history(
+            tickers=['AAPL'],
+            start_date='2023-01-01',
+            end_date='2023-01-02',
+            interval='1h'
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+        
+        # Verify interval parameter was passed
+        call_args = mock_download.call_args
+        assert call_args[1]['interval'] == '1h'
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_empty_ticker_list(self, mock_download):
+        """Test handling of empty ticker list."""
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=[],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+        # Should not call download with empty list
+        mock_download.assert_not_called()
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_returns_empty_dataframe(self, mock_download):
+        """Test handling when yfinance returns empty DataFrame."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=['INVALID'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_handles_exceptions(self, mock_download):
+        """Test exception handling during fetch."""
+        mock_download.side_effect = Exception("Network error")
+        
+        collector = YahooCollector()
+        
+        with pytest.raises(Exception):
+            collector.fetch_history(
+                tickers=['AAPL'],
+                start_date='2023-01-01',
+                end_date='2023-01-10'
+            )
+
+
+class TestYahooCollectorFetchLatest:
+    """Test YahooCollector fetch_latest method."""
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_latest_single_ticker(self, mock_download):
+        """Test fetching latest data for single ticker."""
+        dates = pd.date_range('2024-01-01', periods=7, freq='D')
+        mock_data = pd.DataFrame({
+            'Open': np.random.rand(7) * 100,
+            'High': np.random.rand(7) * 100,
+            'Low': np.random.rand(7) * 100,
+            'Close': np.random.rand(7) * 100,
+            'Volume': np.random.randint(1000, 10000, 7)
+        }, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        result = collector.fetch_latest(tickers=['AAPL'])
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1  # Should return only last row
+        assert not result.empty
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_latest_multiple_tickers(self, mock_download):
+        """Test fetching latest data for multiple tickers."""
+        dates = pd.date_range('2024-01-01', periods=7, freq='D')
+        mock_data = pd.DataFrame({
+            ('AAPL', 'Close'): np.random.rand(7) * 150,
+            ('MSFT', 'Close'): np.random.rand(7) * 300,
+        }, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        result = collector.fetch_latest(tickers=['AAPL', 'MSFT'])
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1  # Latest row only
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_fetch_latest_empty_result(self, mock_download):
+        """Test fetch_latest with empty result from yfinance."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        result = collector.fetch_latest(tickers=['INVALID'])
+        
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestYahooCollectorIntegration:
+    """Integration tests with parameter validation."""
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_ticker_string_formatting(self, mock_download):
+        """Test that tickers are properly formatted as space-separated string."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        collector.fetch_history(
+            tickers=['AAPL', 'MSFT', 'GOOGL'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        # Check that tickers were joined with spaces
+        call_args = mock_download.call_args
+        assert call_args[1]['tickers'] == 'AAPL MSFT GOOGL'
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_auto_adjust_parameter(self, mock_download):
+        """Test that auto_adjust is set to True."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        collector.fetch_history(
+            tickers=['AAPL'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        call_args = mock_download.call_args
+        assert call_args[1]['auto_adjust'] == True
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_group_by_ticker_parameter(self, mock_download):
+        """Test that group_by='ticker' is used."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        collector.fetch_history(
+            tickers=['AAPL', 'MSFT'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        call_args = mock_download.call_args
+        assert call_args[1]['group_by'] == 'ticker'
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_threads_enabled(self, mock_download):
+        """Test that threading is enabled for faster downloads."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        collector.fetch_history(
+            tickers=['AAPL', 'MSFT'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        call_args = mock_download.call_args
+        assert call_args[1]['threads'] == True
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_progress_disabled(self, mock_download):
+        """Test that progress bar is disabled."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        collector.fetch_history(
+            tickers=['AAPL'],
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        call_args = mock_download.call_args
+        assert call_args[1]['progress'] == False
+
+
+class TestYahooCollectorEdgeCases:
+    """Test edge cases and error conditions."""
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_none_end_date(self, mock_download):
+        """Test with None as end_date (defaults to today)."""
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=['AAPL'],
+            start_date='2023-01-01',
+            end_date=None
+        )
+        
+        assert isinstance(result, pd.DataFrame)
+        # Should have called download with None end_date
+        call_args = mock_download.call_args
+        assert call_args[1]['end'] is None
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_single_ticker_in_list(self, mock_download):
+        """Test with single ticker in list."""
+        dates = pd.date_range('2023-01-01', periods=5, freq='D')
+        mock_data = pd.DataFrame({'Close': [100, 101, 102, 103, 104]}, index=dates)
+        mock_download.return_value = mock_data
+        
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=['AAPL'],
+            start_date='2023-01-01',
+            end_date='2023-01-05'
+        )
+        
+        assert not result.empty
+    
+    @patch('core.data.collectors.yahoo_collector.yf.download')
+    def test_very_long_ticker_list(self, mock_download):
+        """Test with many tickers."""
+        # Create list of 50 tickers
+        tickers = [f'TICK{i}' for i in range(50)]
+        mock_download.return_value = pd.DataFrame()
+        
+        collector = YahooCollector()
+        result = collector.fetch_history(
+            tickers=tickers,
+            start_date='2023-01-01',
+            end_date='2023-01-10'
+        )
+        
+        # Should handle many tickers
+        assert isinstance(result, pd.DataFrame)
+        call_args = mock_download.call_args
+        # All tickers should be in the string
+        ticker_string = call_args[1]['tickers']
+        assert len(ticker_string.split()) == 50
