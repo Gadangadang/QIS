@@ -6,44 +6,48 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: Private](https://img.shields.io/badge/license-Private-red.svg)]()
 
-A professional-grade multi-asset, multi-strategy quantitative portfolio management system with advanced signal generation, ensemble methods, comprehensive risk controls, and production-ready backtesting infrastructure.
+> **Portfolio Project:** This repository showcases software engineering skills in quantitative finance. Results shown are for framework demonstration purposes only and do not constitute investment advice or performance claims.
 
-## 🎯 Overview
+Professional-grade quantitative backtesting framework showcasing software engineering best practices in finance.
 
-Institutional-quality quantitative trading framework featuring:
-- **Multi-asset portfolio management** (equity indices, commodities, futures)
-- **Advanced signal strategies** (trend-following long-short, adaptive ensembles, regime-aware signals)
-- **Modular portfolio system** (v2 architecture with clean separation of concerns)
-- **Comprehensive risk management** (dynamic position sizing, stop-loss, drawdown controls)
-- **Professional reporting** (interactive HTML dashboards with Plotly visualizations)
-- **Benchmark analysis** (SPY comparison with alpha/beta metrics, rolling correlations)
+## 🎯 Why This Project?
 
-**Current Status:** Production-ready backtesting infrastructure with paper trading capabilities. Live trading restricted by compliance.
+This repository demonstrates **production-quality software engineering** in quantitative finance:
 
-## 🚀 Key Features
+- **Well-tested codebase**: 51% coverage with 21 passing tests
+- **CI/CD pipeline**: Automated testing across Python 3.9, 3.10, 3.11
+- **Modular architecture**: Clean separation (Portfolio → Risk → Execution → Analysis)
+- **Professional tooling**: Type hints, docstrings, vectorized pandas operations
+- **Realistic modeling**: Transaction costs, slippage, position sizing constraints
 
-### 1. Advanced Signal Strategies
+**Note:** This is a research and engineering showcase, not investment advice or performance claims.
 
-**Trend Following Long-Short:**
-- Multi-timeframe momentum confirmation (fast + slow)
-- Volume and volatility regime filters
-- Can go LONG, SHORT, or FLAT (cash during uncertainty)
-- Designed to capture bear markets and avoid choppy periods
+## 🔧 Framework Capabilities
 
-**Adaptive Ensemble:**
-- Dynamically weights multiple strategies based on rolling Sharpe ratios
-- Adapts to changing market regimes (bull/bear/sideways)
-- Combines momentum, trend-following, mean-reversion
-- Performance-based allocation with signal strength filtering
+| Feature | Implementation |
+|---------|----------------|
+| **Testing** | 51% coverage, 21 passing tests, pytest + CI/CD |
+| **Architecture** | Modular V2 design (Portfolio/Risk/Execution/Analysis) |
+| **Backtesting** | 311 trades with realistic costs (5 bps round-trip) |
+| **Risk Management** | Dynamic sizing, stops, drawdown limits, concentration controls |
+| **Reporting** | Interactive HTML dashboards with Plotly visualizations |
+| **Multi-Asset** | Equities, commodities, futures support |
 
-**Momentum V2:**
-- Enhanced momentum with entry/exit thresholds
-- Configurable lookback periods
-- Risk-adjusted position sizing
+**Focus:** Production-ready infrastructure, not strategy performance.
 
-### 2. Refactored Portfolio System (V2)
+## 🚀 Engineering Highlights
 
-Clean, modular architecture with separation of concerns:
+### 1. Production-Grade Testing & CI/CD
+
+- 51% test coverage with pytest
+- GitHub Actions workflow (Python 3.9, 3.10, 3.11)
+- Codecov integration with coverage reporting
+- Automated linting (black, flake8, isort)
+- 21 passing unit and integration tests
+
+### 2. Modular Architecture (V2 Portfolio System)
+
+Clean separation of concerns with independently testable components:
 
 ```
 PortfolioManagerV2
@@ -69,9 +73,23 @@ PortfolioManagerV2
     └── HTML report generation
 ```
 
-### 3. Multi-Strategy Framework
+### 3. Professional Risk Infrastructure
 
-Apply different strategies to different assets for true diversification:
+- Dynamic position sizing (Kelly criterion, ATR-based)
+- Stop-loss, max drawdown, concentration limits
+- Realistic transaction cost modeling (5 bps round-trip)
+- Risk metrics (VaR, CVaR, underwater charts)
+
+### 4. Research & Reporting Tools
+
+- Interactive HTML dashboards (Plotly)
+- Benchmark analysis (alpha/beta, correlations)
+- Multi-strategy ensemble framework (8+ signals)
+- Comprehensive performance analytics
+
+### 5. Multi-Strategy Framework
+
+Apply different strategies to different assets demonstrating clean API design:
 
 ```python
 strategies = [
@@ -94,12 +112,30 @@ strategies = [
 ]
 ```
 
-**Why this matters:**
-- Signal correlation > Return correlation for diversification
-- Different strategies per asset = lower signal correlation = better diversification
-- 311 trades vs 6 rebalances (50x more signal diversity)
+**Framework demonstrates:**
+- Modular signal composition
+- Clean configuration interface
+- Type-safe signal generation
+- Flexible capital allocation
 
-### 4. Professional Reporting System
+### 6. Signal Strategy Library
+
+**Trend Following Long-Short:**
+- Multi-timeframe momentum confirmation
+- Volume and volatility regime filters
+- Long/short/flat positioning capability
+
+**Adaptive Ensemble:**
+- Dynamic strategy weighting based on rolling Sharpe ratios
+- Regime-aware allocation
+- Combines momentum, trend-following, mean-reversion
+
+**Additional Signals:**
+- Momentum V2 with configurable thresholds
+- Mean reversion strategies
+- Hybrid adaptive signals
+
+### 7. Professional Reporting System
 
 **Performance Report:**
 - Interactive equity curves (portfolio + strategies + SPY benchmark)
@@ -117,9 +153,9 @@ strategies = [
 
 All charts use `.tolist()` serialization to avoid Plotly pandas bugs.
 
-### 5. Benchmark Analysis
+### 8. Benchmark Analysis Framework
 
-Compare against SPY with institutional metrics:
+Compare strategies against benchmarks with institutional metrics:
 - **Alpha & Beta**: Risk-adjusted excess returns
 - **Information Ratio**: Consistency of outperformance
 - **Up/Down Capture**: Performance in bull/bear markets
@@ -233,6 +269,15 @@ summary = PerformanceSummary(
 summary.print_benchmark_comparison()
 summary.print_strategy_rankings()
 ```
+
+**Framework demonstrates:**
+- Multi-strategy ensemble composition
+- Clean API design for backtesting
+- Professional reporting pipeline
+- 311 trades executed with realistic cost modeling
+- Comprehensive performance analytics and risk metrics
+
+*Note: Sample backtest output for demonstration purposes only. Not investment advice.*
 
 ### 3. Explore Research Notebooks
 
@@ -455,21 +500,23 @@ with open('reports/risk.html', 'w') as f:
     f.write(risk_html)
 ```
 
-## 📈 Performance Summary
+## 📊 Framework Demonstration
 
-**Multi-Strategy Portfolio (2015-2024):**
-- **Combined Return:** 147.80%
-- **SPY Benchmark:** 240.81%
-- **Sharpe Ratio:** ~1.8 (portfolio-weighted average)
-- **Max Drawdown:** Better risk management than buy-and-hold
-- **Beta:** 0.364 (lower volatility than market)
-- **Trades:** 311 trades vs 6 rebalances (better signal diversification)
+**Sample Multi-Strategy Backtest (2015-2024):**
 
-**Key Insights:**
-- Signal correlation matters more than return correlation
-- Adaptive ensemble adjusts to market regimes
-- Long-short capability reduces drawdowns
-- Multiple strategies provide true diversification
+This framework executed a multi-strategy portfolio demonstrating:
+- **311 trades** with realistic transaction costs (5 bps round-trip)
+- **Multiple signal strategies** (momentum, trend-following, adaptive ensemble)
+- **Risk management** (dynamic sizing, stops, drawdown controls)
+- **Benchmark comparison** (SPY with alpha/beta analysis)
+
+**Technical Capabilities Demonstrated:**
+- Modular architecture handling multi-asset portfolios
+- Professional risk controls and position sizing
+- Comprehensive reporting and analytics
+- Regime-aware signal adaptation
+
+*Note: Results shown are for framework validation purposes. This is a research and educational tool, not investment advice.*
 
 ## 🔧 Installation
 
@@ -788,9 +835,21 @@ perf: Optimize rolling window calculations
 
 ## 🤝 Contributing
 
-This is a personal research project demonstrating quantitative portfolio management and signal development skills. Not currently accepting external contributions.
+Personal software engineering portfolio showcasing production-quality infrastructure for quantitative finance. Not currently accepting external contributions.
 
-## 📝 License
+## 📝 About
+
+**Purpose:** Demonstrate professional development practices (testing, CI/CD, architecture) in a financial context.
+
+**Status:** Research and educational framework. Not intended for live trading or investment decisions.
+
+**Key Focus Areas:**
+- Production-grade Python development
+- Test-driven development with CI/CD
+- Modular architecture and clean code
+- Financial domain modeling
+
+## 📄 License
 
 Private research project. All rights reserved.
 
@@ -798,7 +857,7 @@ Private research project. All rights reserved.
 
 **Built with:** Python, Pandas, NumPy, Plotly, Matplotlib, SciPy
 
-**Focus:** Institutional-quality backtesting, advanced signal generation, multi-strategy portfolios, professional risk management
+**Engineering Focus:** Production-ready testing, modular architecture, professional risk management, comprehensive documentation
 
 
 
