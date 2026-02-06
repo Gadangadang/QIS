@@ -279,7 +279,7 @@ class TestEnergySeasonalAggressiveSignalGeneration:
         
         # Allow some tolerance as both might be active
         # The key is that aggressive uses lower thresholds
-        assert zeros_aggressive <= zeros_balanced * 1.5
+        assert zeros_aggressive <= zeros_balanced * 1.1  # Allow 10% tolerance
     
     def test_crisis_alpha_parameter(self, energy_price_data):
         """Test that crisis alpha entry parameter is configurable."""
