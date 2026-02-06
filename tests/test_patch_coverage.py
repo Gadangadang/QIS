@@ -272,6 +272,7 @@ class TestRiskDashboardMultiStrategy:
 
             assert Path(save_path).exists()
             content = Path(save_path).read_text()
+            assert 'Strategy_A' in content or 'Strategy_B' in content
             assert 'Risk' in content or 'risk' in content
         finally:
             shutil.rmtree(tmp)
