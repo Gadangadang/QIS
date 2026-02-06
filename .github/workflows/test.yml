@@ -42,11 +42,12 @@ jobs:
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
+      if: matrix.python-version == '3.11'
       with:
         file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
-        fail_ci_if_error: false
+        fail_ci_if_error: true
         verbose: true
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
