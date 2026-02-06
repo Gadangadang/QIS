@@ -493,7 +493,7 @@ class PortfolioPlotter:
             return None
         
         # Align benchmark with portfolio dates
-        bench_prices = self.benchmark_data['Close'].reindex(self.dates, method='ffill')
+        bench_prices = self.benchmark_data['Close'].reindex(self.dates).ffill()
         
         # Calculate buy-and-hold equity
         initial_value = self.total_capital

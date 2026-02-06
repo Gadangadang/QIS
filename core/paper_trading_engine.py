@@ -26,9 +26,22 @@ from typing import Dict, Optional, Tuple
 import pickle
 import warnings
 
-# Using old architecture - see TODO above for migration path
-from archive.cleanup_2025_11_30.old_core_duplicates.portfolio_manager import PortfolioManager, PortfolioConfig, BacktestResult
-from archive.cleanup_2025_11_30.old_core_duplicates.risk_manager import RiskManager
+try:
+    from archive.cleanup_2025_11_30.old_core_duplicates.portfolio_manager import (
+        PortfolioManager, PortfolioConfig, BacktestResult
+    )
+    from archive.cleanup_2025_11_30.old_core_duplicates.risk_manager import RiskManager
+except ImportError:
+    warnings.warn(
+        "PaperTradingEngine depends on archived modules that have been removed. "
+        "This module is deprecated — use core.portfolio.portfolio_manager_v2 instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    PortfolioManager = None
+    PortfolioConfig = None
+    BacktestResult = None
+    RiskManager = None
 
 
 class PaperTradingState:

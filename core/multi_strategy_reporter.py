@@ -332,11 +332,6 @@ class MultiStrategyReporter:
         benchmark_name: str
     ) -> str:
         """Generate main equity curve chart with all strategies + composite + benchmark."""
-        print(f"🔍 DEBUG _generate_main_chart called with {len(strategy_results)} strategies")
-        for name, data in strategy_results.items():
-            eq = data['result'].equity_curve
-            print(f"  {name}: {eq['TotalValue'].iloc[0]:.2f} → {eq['TotalValue'].iloc[-1]:.2f}")
-        
         fig = go.Figure()
         
         # Individual strategies (dashed lines)
@@ -387,12 +382,6 @@ class MultiStrategyReporter:
                 bgcolor='rgba(255,255,255,0.8)'
             )
         )
-        
-        # DEBUG: Check what's in the figure before serialization
-        print(f"🔍 DEBUG Figure has {len(fig.data)} traces:")
-        for i, trace in enumerate(fig.data):
-            y_vals = trace.y
-            print(f"  Trace {i} ({trace.name}): y[0]={y_vals[0]:.2f}, y[-1]={y_vals[-1]:.2f}, len={len(y_vals)}")
         
         # Add timestamp for cache busting
         import time
