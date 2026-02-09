@@ -262,7 +262,7 @@ class TestPrintSummary:
         finally:
             sys.stdout = sys.__stdout__
     
-    @patch('core.portfolio.backtest_result.BenchmarkComparator')
+    @patch('core.benchmark.BenchmarkComparator')
     def test_print_summary_benchmark_metrics_displayed(
         self,
         mock_comparator_class,
@@ -457,7 +457,6 @@ class TestPlotEquityCurve:
         assert 'figsize' in kwargs
         assert kwargs['figsize'] == (14, 10)
     
-    @patch('core.portfolio.backtest_result.plt', None)
     def test_plot_equity_curve_matplotlib_not_available(
         self,
         simple_backtest_result
@@ -465,22 +464,30 @@ class TestPlotEquityCurve:
         """
         Test behavior when matplotlib is not available.
         
-        Arrange: Simulate missing matplotlib
+        Arrange: Mock builtins to raise ImportError for matplotlib
         Act: Call plot_equity_curve()
         Assert: Prints error message, doesn't crash
         """
         captured_output = StringIO()
         sys.stdout = captured_output
         
-        try:
-            simple_backtest_result.plot_equity_curve()
-            output = captured_output.getvalue()
-            
-            # Should print message about matplotlib
-            assert "Matplotlib not available" in output or "No data to plot" in output
-            
-        finally:
-            sys.stdout = sys.__stdout__
+        # Create a custom import function that fails for matplotlib
+        original_import = __builtins__.__import__
+        def mock_import(name, *args, **kwargs):
+            if 'matplotlib' in name:
+                raise ImportError(f"No module named '{name}'")
+            return original_import(name, *args, **kwargs)
+        
+        with patch('builtins.__import__', side_effect=mock_import):
+            try:
+                simple_backtest_result.plot_equity_curve()
+                output = captured_output.getvalue()
+                
+                # Should print message about matplotlib
+                assert "Matplotlib not available" in output or "No data to plot" in output
+                
+            finally:
+                sys.stdout = sys.__stdout__
 
 
 # ============================================================================
@@ -626,7 +633,7 @@ class TestRiskAnalysis:
 class TestGenerateHtmlReport:
     """Test generate_html_report() method."""
     
-    @patch('core.portfolio.backtest_result.Reporter')
+    @patch('core.reporter.Reporter')
     def test_generate_html_report_basic(
         self,
         mock_reporter_class,
@@ -648,7 +655,7 @@ class TestGenerateHtmlReport:
         mock_reporter_class.assert_called_once()
         mock_reporter.generate_html_report.assert_called_once()
     
-    @patch('core.portfolio.backtest_result.Reporter')
+    @patch('core.reporter.Reporter')
     def test_generate_html_report_parameters(
         self,
         mock_reporter_class,
@@ -676,7 +683,7 @@ class TestGenerateHtmlReport:
         assert 'save_path' in kwargs
         assert kwargs['save_path'] == save_path
     
-    @patch('core.portfolio.backtest_result.Reporter')
+    @patch('core.reporter.Reporter')
     def test_generate_html_report_equity_df_format(
         self,
         mock_reporter_class,
@@ -701,7 +708,7 @@ class TestGenerateHtmlReport:
         # Should have Date column
         assert 'Date' in equity_df.columns
     
-    @patch('core.portfolio.backtest_result.Reporter')
+    @patch('core.reporter.Reporter')
     def test_generate_html_report_success_message(
         self,
         mock_reporter_class,
@@ -730,7 +737,7 @@ class TestGenerateHtmlReport:
         finally:
             sys.stdout = sys.__stdout__
     
-    @patch('core.portfolio.backtest_result.Reporter')
+    @patch('core.reporter.Reporter')
     def test_generate_html_report_exception_handling(
         self,
         mock_reporter_class,
@@ -768,21 +775,26 @@ class TestGenerateHtmlReport:
         Act: Call generate_html_report() when Reporter doesn't exist
         Assert: Handles gracefully with error message
         """
-        # This test simulates import failure
-        # In real case, the import would fail at the top of the method
+        # Mock builtins to raise ImportError for core.reporter
         captured_output = StringIO()
         sys.stdout = captured_output
         
-        try:
-            # If Reporter doesn't exist, should catch exception
-            with patch('core.portfolio.backtest_result.Reporter', side_effect=ImportError):
+        original_import = __builtins__.__import__
+        def mock_import(name, *args, **kwargs):
+            if 'core.reporter' in name:
+                raise ImportError(f"No module named '{name}'")
+            return original_import(name, *args, **kwargs)
+        
+        with patch('builtins.__import__', side_effect=mock_import):
+            try:
                 simple_backtest_result.generate_html_report('test.html')
-            
-            # Note: Implementation catches generic Exception, so this might not be reached
-            # depending on actual implementation
-            
-        finally:
-            sys.stdout = sys.__stdout__
+                output = captured_output.getvalue()
+                
+                # Should print error message
+                assert "Could not generate HTML report" in output or "⚠" in output
+                
+            finally:
+                sys.stdout = sys.__stdout__
 
 
 # ============================================================================
