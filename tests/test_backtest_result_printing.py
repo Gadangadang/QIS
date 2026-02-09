@@ -338,11 +338,12 @@ class TestPlotEquityCurve:
         Act: Call plot_equity_curve()
         Assert: plt.subplots and plt.show are called
         """
-        # Setup mock axes
+        # Setup mock axes - use numpy array to match matplotlib behavior
+        import numpy as np
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        mock_subplots.return_value = (mock_fig, [mock_ax1, mock_ax2])
+        mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         # Call method
         simple_backtest_result.plot_equity_curve()
@@ -366,10 +367,11 @@ class TestPlotEquityCurve:
         Act: Call plot_equity_curve()
         Assert: Creates 2 subplots
         """
+        import numpy as np
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        mock_subplots.return_value = (mock_fig, [mock_ax1, mock_ax2])
+        mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
         
@@ -393,10 +395,11 @@ class TestPlotEquityCurve:
         Act: Call plot_equity_curve()
         Assert: plot() method is called on Series
         """
+        import numpy as np
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        mock_subplots.return_value = (mock_fig, [mock_ax1, mock_ax2])
+        mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
         
@@ -446,15 +449,17 @@ class TestPlotEquityCurve:
         Act: Call plot_equity_curve()
         Assert: figsize parameter is (14, 10)
         """
+        import numpy as np
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        mock_subplots.return_value = (mock_fig, [mock_ax1, mock_ax2])
+        mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
         
         args, kwargs = mock_subplots.call_args
         assert 'figsize' in kwargs
+        assert kwargs['figsize'] == (14, 10)
         assert kwargs['figsize'] == (14, 10)
     
     def test_plot_equity_curve_matplotlib_not_available(
@@ -471,8 +476,10 @@ class TestPlotEquityCurve:
         captured_output = StringIO()
         sys.stdout = captured_output
         
-        # Create a custom import function that fails for matplotlib
-        original_import = __builtins__.__import__
+        # Import builtins module to get the real __import__
+        import builtins
+        original_import = builtins.__import__
+        
         def mock_import(name, *args, **kwargs):
             if 'matplotlib' in name:
                 raise ImportError(f"No module named '{name}'")
@@ -779,7 +786,9 @@ class TestGenerateHtmlReport:
         captured_output = StringIO()
         sys.stdout = captured_output
         
-        original_import = __builtins__.__import__
+        import builtins
+        original_import = builtins.__import__
+        
         def mock_import(name, *args, **kwargs):
             if 'core.reporter' in name:
                 raise ImportError(f"No module named '{name}'")
@@ -808,13 +817,13 @@ class TestBacktestResultEdgeCasesExtended:
         """
         Test all methods with minimal viable data.
         
-        Arrange: Create BacktestResult with 1 day of data
+        Arrange: Create BacktestResult with 2 days of data (minimum for returns)
         Act: Call all public methods
         Assert: No crashes
         """
-        dates = pd.date_range('2023-01-01', periods=1, freq='D')
+        dates = pd.date_range('2023-01-01', periods=2, freq='D')
         equity = pd.DataFrame({
-            'TotalValue': [100000]
+            'TotalValue': [100000, 100100]
         }, index=dates)
         
         trades = pd.DataFrame({

@@ -47,11 +47,12 @@ class MockBacktestResult:
             'Holdings': equity_values * 0.7
         }, index=dates)
         
-        # Create mock trades
+        # Create mock trades - ensure all arrays have same length
         num_trades = min(5, len(dates))
+        actions = (['BUY', 'SELL'] * (num_trades // 2 + 1))[:num_trades]
         self.trades = pd.DataFrame({
             'Date': dates[:num_trades],
-            'Action': ['BUY', 'SELL'] * (num_trades // 2 + 1),
+            'Action': actions,
             'Price': [100, 105, 102, 108, 110][:num_trades],
             'Shares': [10, 10, 15, 15, 20][:num_trades]
         })
