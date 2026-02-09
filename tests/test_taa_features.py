@@ -48,7 +48,7 @@ class TestPriceFeatureGenerator:
         )
         
         data = []
-        for ticker in tickers:
+        for _ in tickers:
             returns = np.random.normal(0.0005, 0.01, len(dates))
             close_prices = 100 * (1 + returns).cumprod()
             

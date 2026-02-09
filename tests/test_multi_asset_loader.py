@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import tempfile
+import shutil
 
 from core.multi_asset_loader import MultiAssetLoader
 
@@ -19,20 +20,8 @@ class TestMultiAssetLoader:
         """Create temporary dataset directory."""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
-        # Cleanup happens automatically
-
-    @pytest.fixture
-    def sample_csv_data(self):
-        """Create sample CSV data."""
-        dates = pd.date_range(start='2023-01-01', end='2023-12-31', freq='D')
-        return pd.DataFrame({
-            'Date': dates.strftime('%Y-%m-%d'),
-            'Open': np.random.uniform(100, 110, len(dates)),
-            'High': np.random.uniform(110, 120, len(dates)),
-            'Low': np.random.uniform(90, 100, len(dates)),
-            'Close': np.random.uniform(100, 110, len(dates)),
-            'Volume': np.random.randint(1000000, 10000000, len(dates))
-        })
+        # Cleanup
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_initialization_default_dir(self):
         """Test MultiAssetLoader initialization with default directory."""
