@@ -11,6 +11,8 @@ Focuses on:
 Run with: pytest tests/test_walk_forward_extended.py -v --cov=core/walk_forward_optimizer
 """
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import numpy as np

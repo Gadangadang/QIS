@@ -12,6 +12,8 @@ Focuses on:
 Run with: pytest tests/test_portfolio_manager_v2_extended.py -v --cov=core/portfolio/portfolio_manager_v2
 """
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import numpy as np

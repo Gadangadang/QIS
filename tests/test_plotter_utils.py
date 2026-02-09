@@ -11,6 +11,8 @@ Focuses on:
 Run with: pytest tests/test_plotter_utils.py -v --cov=utils/plotter
 """
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import numpy as np

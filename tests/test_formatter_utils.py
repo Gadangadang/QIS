@@ -11,6 +11,8 @@ Coverage targets:
 - Lines 120, 160, 201-225, 229-272, 305-309, 317, 344-364, 370-372, 377-386
 """
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import numpy as np

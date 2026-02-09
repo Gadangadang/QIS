@@ -9,6 +9,8 @@ Tests uncovered functionality in core/taa/features/pipeline.py:
 - Edge cases: empty data, missing columns, date misalignment
 """
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import numpy as np

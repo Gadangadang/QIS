@@ -9,6 +9,8 @@ Tests uncovered functionality in core/taa/features/relative.py:
 - MultiIndex handling
 """
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import numpy as np
