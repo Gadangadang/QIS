@@ -6,11 +6,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-# Import directly to avoid pipeline importing collectors
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
+# Import directly without sys.path manipulation
 from core.taa.features.price import PriceFeatureGenerator
 from core.taa.features.macro import MacroFeatureGenerator
 from core.taa.features.relative import RelativeValueFeatureGenerator
@@ -275,17 +271,12 @@ class TestRelativeValueFeatureGenerator:
         assert result.empty
 
     def test_generate_without_benchmark_returns_empty(self, sample_asset_data):
-        """Test that generation without benchmark returns empty or raises error."""
+        """Test that generation without benchmark returns empty."""
         generator = RelativeValueFeatureGenerator()
         
-        # Either should return empty or require benchmark parameter
-        try:
-            result = generator.generate(sample_asset_data)
-            # If it returns, should be empty or handle gracefully
-            assert True
-        except (KeyError, TypeError):
-            # If it raises error, that's also acceptable
-            assert True
+        # Without benchmark parameter, should return empty
+        result = generator.generate(sample_asset_data)
+        assert result.empty
 
     def test_empty_dataframe_returns_empty(self):
         """Test that empty DataFrame returns empty result."""

@@ -172,12 +172,8 @@ class TestPortfolioPlotter:
         """Test basic equity curve plotting."""
         plotter = PortfolioPlotter(sample_strategy_results)
         
-        # Should not raise an error
-        try:
-            plotter.plot_equity_curves()
-            assert True
-        except Exception as e:
-            pytest.fail(f"plot_equity_curves raised {type(e).__name__}: {e}")
+        # Should execute without raising an error
+        plotter.plot_equity_curves()
 
     def test_plot_equity_curves_with_benchmark(self, sample_strategy_results, sample_benchmark_data):
         """Test equity curve plotting with benchmark."""
@@ -186,23 +182,15 @@ class TestPortfolioPlotter:
             benchmark_data=sample_benchmark_data
         )
         
-        # Should not raise an error
-        try:
-            plotter.plot_equity_curves(show_benchmark=True)
-            assert True
-        except Exception as e:
-            pytest.fail(f"plot_equity_curves with benchmark raised {type(e).__name__}: {e}")
+        # Should execute without raising an error
+        plotter.plot_equity_curves(show_benchmark=True)
 
     def test_plot_equity_curves_multi_strategy(self, multi_strategy_results):
         """Test equity curve plotting with multiple strategies."""
         plotter = PortfolioPlotter(multi_strategy_results)
         
-        # Should not raise an error
-        try:
-            plotter.plot_equity_curves(show_individual=True)
-            assert True
-        except Exception as e:
-            pytest.fail(f"plot_equity_curves for multi-strategy raised {type(e).__name__}: {e}")
+        # Should execute without raising an error
+        plotter.plot_equity_curves(show_individual=True)
 
     def test_plotter_handles_positive_equity(self, sample_strategy_results):
         """Test that plotter handles positive equity values."""
@@ -234,31 +222,19 @@ class TestPortfolioPlotter:
         """Test that plot_drawdown executes without error."""
         plotter = PortfolioPlotter(sample_strategy_results)
         
-        # Should not raise an error
-        try:
-            plotter.plot_drawdown()
-            assert True
-        except Exception as e:
-            pytest.fail(f"plot_drawdown raised {type(e).__name__}: {e}")
+        # Should execute without raising an error
+        plotter.plot_drawdown()
 
     def test_plot_monthly_returns_executes(self, sample_strategy_results):
         """Test that plot_monthly_returns_heatmap executes without error."""
         plotter = PortfolioPlotter(sample_strategy_results)
         
-        # Should not raise an error
-        try:
-            plotter.plot_monthly_returns_heatmap()
-            assert True
-        except Exception as e:
-            pytest.fail(f"plot_monthly_returns_heatmap raised {type(e).__name__}: {e}")
+        # Should execute without raising an error
+        plotter.plot_monthly_returns_heatmap()
 
     def test_plot_rolling_metrics_executes(self, sample_strategy_results):
         """Test that plot_rolling_metrics executes without error."""
         plotter = PortfolioPlotter(sample_strategy_results)
         
-        # Should not raise an error
-        try:
-            plotter.plot_rolling_metrics()
-            assert True
-        except Exception as e:
-            pytest.fail(f"plot_rolling_metrics raised {type(e).__name__}: {e}")
+        # Should execute without raising an error
+        plotter.plot_rolling_metrics()
