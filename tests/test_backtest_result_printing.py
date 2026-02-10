@@ -343,6 +343,9 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
+        # Configure axes to have figure attribute
+        mock_ax1.figure = mock_fig
+        mock_ax2.figure = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         # Call method
@@ -371,6 +374,9 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
+        # Configure axes to have figure attribute
+        mock_ax1.figure = mock_fig
+        mock_ax2.figure = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
@@ -399,6 +405,9 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
+        # Configure axes to have figure attribute
+        mock_ax1.figure = mock_fig
+        mock_ax2.figure = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
@@ -453,6 +462,9 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
+        # Configure axes to have figure attribute
+        mock_ax1.figure = mock_fig
+        mock_ax2.figure = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
