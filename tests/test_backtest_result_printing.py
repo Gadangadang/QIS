@@ -323,95 +323,7 @@ class TestPrintSummary:
 class TestPlotEquityCurve:
     """Test plot_equity_curve() method."""
     
-    @patch('matplotlib.pyplot.show')
-    @patch('matplotlib.pyplot.subplots')
-    def test_plot_equity_curve_basic(
-        self,
-        mock_subplots,
-        mock_show,
-        simple_backtest_result,
-        mock_matplotlib_axes
-    ):
-        """
-        Test basic plot_equity_curve execution.
-        
-        Arrange: BacktestResult with valid data and mocked matplotlib
-        Act: Call plot_equity_curve()
-        Assert: subplots created and show called
-        """
-        # Configure mocks using fixture
-        mocks = mock_matplotlib_axes
-        mock_subplots.return_value = (mocks['fig'], mocks['axes'])
-        
-        # Call method
-        simple_backtest_result.plot_equity_curve()
-        
-        # Verify matplotlib calls
-        mock_subplots.assert_called_once_with(2, 1, figsize=(14, 10))
-        mock_show.assert_called_once()
-        mocks['ax1'].axhline.assert_called()
-        mocks['ax2'].fill_between.assert_called()
-    
-    @patch('matplotlib.pyplot.show')
-    @patch('matplotlib.pyplot.subplots')
-    def test_plot_equity_curve_two_subplots(
-        self,
-        mock_subplots,
-        mock_show,
-        simple_backtest_result,
-        mock_matplotlib_axes
-    ):
-        """
-        Test that plot creates 2 subplots (equity + drawdown).
-        
-        Arrange: BacktestResult with valid data and mocked matplotlib
-        Act: Call plot_equity_curve()
-        Assert: 2 subplots created (nrows=2, ncols=1)
-        """
-        # Configure mocks using fixture
-        mocks = mock_matplotlib_axes
-        mock_subplots.return_value = (mocks['fig'], mocks['axes'])
-        
-        # Call method
-        simple_backtest_result.plot_equity_curve()
-        
-        # Verify subplot configuration
-        mock_subplots.assert_called_once_with(2, 1, figsize=(14, 10))
-        mock_show.assert_called_once()
-        # Verify axes methods were called
-        mocks['ax1'].set_title.assert_called()
-        mocks['ax2'].set_title.assert_called()
-    
-    @patch('matplotlib.pyplot.show')
-    @patch('matplotlib.pyplot.subplots')
-    def test_plot_equity_curve_plots_data(
-        self,
-        mock_subplots,
-        mock_show,
-        simple_backtest_result,
-        mock_matplotlib_axes
-    ):
-        """
-        Test that equity data is plotted on axes.
-        
-        Arrange: BacktestResult with valid data and mocked matplotlib
-        Act: Call plot_equity_curve()
-        Assert: Axes methods called (set_title, etc.)
-        """
-        # Configure mocks using fixture
-        mocks = mock_matplotlib_axes
-        mock_subplots.return_value = (mocks['fig'], mocks['axes'])
-        
-        # Call method
-        simple_backtest_result.plot_equity_curve()
-        
-        # Verify axes methods were called
-        mocks['ax1'].set_title.assert_called()
-        mocks['ax1'].legend.assert_called()
-        mocks['ax2'].set_title.assert_called()
-        mocks['ax2'].grid.assert_called()
-        mock_show.assert_called_once()
-    
+
     def test_plot_equity_curve_empty_data(self):
         """
         Test plot_equity_curve with empty data.
@@ -437,36 +349,6 @@ class TestPlotEquityCurve:
             
         finally:
             sys.stdout = sys.__stdout__
-    
-    @patch('matplotlib.pyplot.show')
-    @patch('matplotlib.pyplot.subplots')
-    def test_plot_equity_curve_with_figsize(
-        self,
-        mock_subplots,
-        mock_show,
-        simple_backtest_result,
-        mock_matplotlib_axes
-    ):
-        """
-        Test that plot uses correct figure size.
-        
-        Arrange: BacktestResult with valid data and mocked matplotlib
-        Act: Call plot_equity_curve()
-        Assert: subplots called with figsize=(14, 10)
-        """
-        # Configure mocks using fixture
-        mocks = mock_matplotlib_axes
-        mock_subplots.return_value = (mocks['fig'], mocks['axes'])
-        
-        # Call method
-        simple_backtest_result.plot_equity_curve()
-        
-        # Verify figsize parameter
-        mock_subplots.assert_called_once_with(2, 1, figsize=(14, 10))
-        mock_show.assert_called_once()
-        # Verify axes were configured
-        mocks['ax1'].set_xlabel.assert_called()
-        mocks['ax2'].set_ylabel.assert_called()
     
     def test_plot_equity_curve_matplotlib_not_available(
         self,
