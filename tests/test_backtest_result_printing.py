@@ -346,6 +346,9 @@ class TestPlotEquityCurve:
         # Configure axes to have figure attribute
         mock_ax1.figure = mock_fig
         mock_ax2.figure = mock_fig
+        # Configure get_figure() method for pandas plotting
+        mock_ax1.get_figure.return_value = mock_fig
+        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         # Call method
@@ -377,6 +380,9 @@ class TestPlotEquityCurve:
         # Configure axes to have figure attribute
         mock_ax1.figure = mock_fig
         mock_ax2.figure = mock_fig
+        # Configure get_figure() method for pandas plotting
+        mock_ax1.get_figure.return_value = mock_fig
+        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
@@ -408,6 +414,9 @@ class TestPlotEquityCurve:
         # Configure axes to have figure attribute
         mock_ax1.figure = mock_fig
         mock_ax2.figure = mock_fig
+        # Configure get_figure() method for pandas plotting
+        mock_ax1.get_figure.return_value = mock_fig
+        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
@@ -465,6 +474,9 @@ class TestPlotEquityCurve:
         # Configure axes to have figure attribute
         mock_ax1.figure = mock_fig
         mock_ax2.figure = mock_fig
+        # Configure get_figure() method for pandas plotting
+        mock_ax1.get_figure.return_value = mock_fig
+        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
