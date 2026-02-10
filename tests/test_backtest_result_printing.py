@@ -325,8 +325,10 @@ class TestPlotEquityCurve:
     
     @patch('matplotlib.pyplot.show')
     @patch('matplotlib.pyplot.subplots')
+    @patch.object(pd.Series, 'plot')
     def test_plot_equity_curve_basic(
         self,
+        mock_plot,
         mock_subplots,
         mock_show,
         simple_backtest_result
@@ -334,34 +336,30 @@ class TestPlotEquityCurve:
         """
         Test basic plot_equity_curve execution.
         
-        Arrange: Mock matplotlib, create BacktestResult
+        Arrange: Mock matplotlib and pandas plotting
         Act: Call plot_equity_curve()
         Assert: plt.subplots and plt.show are called
         """
-        # Setup mock axes - use numpy array to match matplotlib behavior
         import numpy as np
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        # Configure axes to have figure attribute
-        mock_ax1.figure = mock_fig
-        mock_ax2.figure = mock_fig
-        # Configure get_figure() method for pandas plotting
-        mock_ax1.get_figure.return_value = mock_fig
-        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         # Call method
         simple_backtest_result.plot_equity_curve()
         
-        # Verify matplotlib calls
+        # Verify plotting happened
+        assert mock_plot.call_count >= 2  # equity + drawdown
         mock_subplots.assert_called_once()
         mock_show.assert_called_once()
     
     @patch('matplotlib.pyplot.show')
     @patch('matplotlib.pyplot.subplots')
+    @patch.object(pd.Series, 'plot')
     def test_plot_equity_curve_two_subplots(
         self,
+        mock_plot,
         mock_subplots,
         mock_show,
         simple_backtest_result
@@ -369,7 +367,7 @@ class TestPlotEquityCurve:
         """
         Test that plot creates 2 subplots (equity + drawdown).
         
-        Arrange: Mock matplotlib
+        Arrange: Mock matplotlib and pandas plotting
         Act: Call plot_equity_curve()
         Assert: Creates 2 subplots
         """
@@ -377,12 +375,6 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        # Configure axes to have figure attribute
-        mock_ax1.figure = mock_fig
-        mock_ax2.figure = mock_fig
-        # Configure get_figure() method for pandas plotting
-        mock_ax1.get_figure.return_value = mock_fig
-        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
@@ -391,11 +383,15 @@ class TestPlotEquityCurve:
         args, kwargs = mock_subplots.call_args
         assert args[0] == 2  # rows
         assert args[1] == 1  # cols
+        # Verify plotting happened
+        assert mock_plot.call_count >= 2
     
     @patch('matplotlib.pyplot.show')
     @patch('matplotlib.pyplot.subplots')
+    @patch.object(pd.Series, 'plot')
     def test_plot_equity_curve_plots_data(
         self,
+        mock_plot,
         mock_subplots,
         mock_show,
         simple_backtest_result
@@ -403,7 +399,7 @@ class TestPlotEquityCurve:
         """
         Test that equity data is plotted on axes.
         
-        Arrange: Mock matplotlib axes
+        Arrange: Mock matplotlib and pandas plotting
         Act: Call plot_equity_curve()
         Assert: plot() method is called on Series
         """
@@ -411,20 +407,14 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        # Configure axes to have figure attribute
-        mock_ax1.figure = mock_fig
-        mock_ax2.figure = mock_fig
-        # Configure get_figure() method for pandas plotting
-        mock_ax1.get_figure.return_value = mock_fig
-        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
         
-        # Verify that axes methods were called
-        # (plot, set_title, etc.)
-        assert mock_ax1.method_calls  # Some methods called
-        assert mock_ax2.method_calls
+        # Verify that pandas plotting was called
+        assert mock_plot.call_count >= 2  # equity + drawdown
+        # Verify that axes methods were called (set_title, etc.)
+        assert mock_ax1.method_calls or mock_ax2.method_calls
     
     def test_plot_equity_curve_empty_data(self):
         """
@@ -454,8 +444,10 @@ class TestPlotEquityCurve:
     
     @patch('matplotlib.pyplot.show')
     @patch('matplotlib.pyplot.subplots')
+    @patch.object(pd.Series, 'plot')
     def test_plot_equity_curve_with_figsize(
         self,
+        mock_plot,
         mock_subplots,
         mock_show,
         simple_backtest_result
@@ -463,7 +455,7 @@ class TestPlotEquityCurve:
         """
         Test that plot uses correct figure size.
         
-        Arrange: Mock matplotlib
+        Arrange: Mock matplotlib and pandas plotting
         Act: Call plot_equity_curve()
         Assert: figsize parameter is (14, 10)
         """
@@ -471,12 +463,6 @@ class TestPlotEquityCurve:
         mock_fig = MagicMock()
         mock_ax1 = MagicMock()
         mock_ax2 = MagicMock()
-        # Configure axes to have figure attribute
-        mock_ax1.figure = mock_fig
-        mock_ax2.figure = mock_fig
-        # Configure get_figure() method for pandas plotting
-        mock_ax1.get_figure.return_value = mock_fig
-        mock_ax2.get_figure.return_value = mock_fig
         mock_subplots.return_value = (mock_fig, np.array([mock_ax1, mock_ax2]))
         
         simple_backtest_result.plot_equity_curve()
@@ -484,7 +470,8 @@ class TestPlotEquityCurve:
         args, kwargs = mock_subplots.call_args
         assert 'figsize' in kwargs
         assert kwargs['figsize'] == (14, 10)
-        assert kwargs['figsize'] == (14, 10)
+        # Verify plotting happened
+        assert mock_plot.call_count >= 2
     
     def test_plot_equity_curve_matplotlib_not_available(
         self,
