@@ -164,7 +164,10 @@ def mock_matplotlib_axes():
     # Configure all common matplotlib methods
     for ax in [mock_ax1, mock_ax2]:
         ax.figure = mock_fig
-        ax.get_figure.return_value = mock_fig
+        ax.get_figure = MagicMock(return_value=mock_fig)
+        ax.xaxis = MagicMock()
+        ax.yaxis = MagicMock()
+        ax.yaxis.set_major_formatter = MagicMock()
         ax.axhline = MagicMock(return_value=None)
         ax.axvline = MagicMock(return_value=None)
         ax.plot = MagicMock(return_value=[MagicMock()])
@@ -173,8 +176,11 @@ def mock_matplotlib_axes():
         ax.set_ylabel = MagicMock(return_value=None)
         ax.legend = MagicMock(return_value=None)
         ax.grid = MagicMock(return_value=None)
+        ax.fill_between = MagicMock(return_value=None)
     
     axes = np.array([mock_ax1, mock_ax2])
+    # Critical: Add figure attribute to the array itself
+    axes.figure = mock_fig
     
     return {
         'fig': mock_fig,
