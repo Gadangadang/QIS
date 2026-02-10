@@ -135,3 +135,50 @@ def approx():
     def _approx(value, rel=1e-4, abs=1e-6):
         return pytest.approx(value, rel=rel, abs=abs)
     return _approx
+
+
+@pytest.fixture
+def mock_matplotlib_axes():
+    """Fixture providing properly configured matplotlib mocks.
+    
+    Returns:
+        dict: Dictionary containing:
+            - 'fig': Mock figure object
+            - 'axes': NumPy array of [mock_ax1, mock_ax2]
+            - 'ax1': First mock axes
+            - 'ax2': Second mock axes
+    
+    Example:
+        def test_plotting(self, mock_matplotlib_axes):
+            mocks = mock_matplotlib_axes
+            with patch('matplotlib.pyplot.subplots', return_value=(mocks['fig'], mocks['axes'])):
+                # Use in test
+                pass
+    """
+    from unittest.mock import MagicMock
+    
+    mock_fig = MagicMock()
+    mock_ax1 = MagicMock()
+    mock_ax2 = MagicMock()
+    
+    # Configure all common matplotlib methods
+    for ax in [mock_ax1, mock_ax2]:
+        ax.figure = mock_fig
+        ax.get_figure.return_value = mock_fig
+        ax.axhline = MagicMock(return_value=None)
+        ax.axvline = MagicMock(return_value=None)
+        ax.plot = MagicMock(return_value=[MagicMock()])
+        ax.set_title = MagicMock(return_value=None)
+        ax.set_xlabel = MagicMock(return_value=None)
+        ax.set_ylabel = MagicMock(return_value=None)
+        ax.legend = MagicMock(return_value=None)
+        ax.grid = MagicMock(return_value=None)
+    
+    axes = np.array([mock_ax1, mock_ax2])
+    
+    return {
+        'fig': mock_fig,
+        'axes': axes,
+        'ax1': mock_ax1,
+        'ax2': mock_ax2
+    }
