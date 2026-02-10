@@ -178,9 +178,8 @@ def mock_matplotlib_axes():
         ax.grid = MagicMock(return_value=None)
         ax.fill_between = MagicMock(return_value=None)
     
-    axes = np.array([mock_ax1, mock_ax2])
-    # Critical: Add figure attribute to the array itself
-    axes.figure = mock_fig
+    # Use Python list (matches matplotlib's actual return type)
+    axes = [mock_ax1, mock_ax2]
     
     return {
         'fig': mock_fig,
