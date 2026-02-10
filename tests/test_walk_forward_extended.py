@@ -443,7 +443,7 @@ class TestOptimization:
         assert len(periods) > 0
         assert all(isinstance(p, WalkForwardPeriod) for p in periods)
     
-@pytest.mark.skip(reason="Verbose mode issue with get_summary_statistics")
+    @pytest.mark.skip(reason="Verbose mode issue with get_summary_statistics")
     def test_optimize_with_verbose(self, short_prices):
         """Test optimization with verbose output."""
         # Arrange
