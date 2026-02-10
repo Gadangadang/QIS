@@ -235,8 +235,12 @@ class PortfolioPlotter:
         
         # Pivot to heatmap format
         heatmap_data = monthly_returns.pivot(index='Year', columns='Month', values=monthly_returns.columns[0])
-        heatmap_data.columns = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        
+        # Assign month labels only for months that exist in the data
+        month_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        # Map month numbers to labels for actual columns present
+        heatmap_data.columns = [month_labels[int(col) - 1] for col in heatmap_data.columns]
         
         # Plot heatmap
         fig, ax = plt.subplots(figsize=figsize)
