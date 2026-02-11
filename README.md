@@ -13,7 +13,7 @@ Production-grade multi-strategy backtesting framework built in Python. Demonstra
 
 | Area | Details |
 |------|---------|
-| **Testing** | 261 passing tests · CI across Python 3.9 / 3.10 / 3.11 · Codecov |
+| **Testing** | 820 passing tests · 70% coverage · CI across Python 3.9 / 3.10 / 3.11 · Codecov |
 | **Architecture** | Modular V2 design — Portfolio · Risk · Execution · Analysis |
 | **Signals** | 8 strategies (momentum, mean-reversion, trend-following L/S, adaptive ensemble) |
 | **Risk** | Dynamic sizing (Kelly, ATR), stop-loss, drawdown limits, concentration controls |
@@ -73,7 +73,7 @@ signals/                # Signal generators (base, momentum, mean-reversion,
                         #   trend-following L/S, ensemble, hybrid, energy-seasonal)
 
 utils/                  # Plotting, formatting, param loading
-tests/                  # 261 tests (pytest)
+tests/                  # 820 tests (pytest)
 notebooks/              # Research & demo notebooks
 ```
 
