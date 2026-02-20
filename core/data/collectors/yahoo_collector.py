@@ -1,5 +1,5 @@
 """
-Yahoo Finance Data Collector.
+Facset Data Collector.
 """
 
 from typing import List, Optional, Union, Dict

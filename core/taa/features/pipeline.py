@@ -6,7 +6,14 @@ Orchestrates data collection, alignment, and feature generation.
 import pandas as pd
 import logging
 from typing import List, Dict, Optional
-from core.data.collectors import YahooCollector, FredCollector
+
+# Import both collectors
+from core.data.collectors import (
+    YahooCollector, 
+    FactSetCollector, 
+    FACTSET_AVAILABLE
+)
+from core.data.collectors import FredCollector
 from core.data.processors import PriceProcessor
 from .price import PriceFeatureGenerator
 from .macro import MacroFeatureGenerator
@@ -19,8 +26,25 @@ class FeaturePipeline:
     Orchestrates the end-to-end feature generation process.
     """
     
-    def __init__(self):
-        self.yahoo = YahooCollector()
+    def __init__(self, use_factset: bool = False):
+        """
+        Initialize feature pipeline.
+        
+        Args:
+            use_factset: If True and available, use FactSet instead of Yahoo
+        """
+        # Choose data source
+        if use_factset and FACTSET_AVAILABLE:
+            logger.info("Using FactSet data collector")
+            self.data_collector = FactSetCollector()
+            self.use_factset = True
+        else:
+            if use_factset and not FACTSET_AVAILABLE:
+                logger.warning("FactSet requested but not available, falling back to Yahoo")
+            logger.info("Using Yahoo Finance data collector")
+            self.data_collector = YahooCollector()
+            self.use_factset = False
+        
         self.fred = FredCollector()
         self.processor = PriceProcessor()
         
@@ -38,7 +62,7 @@ class FeaturePipeline:
         
         Args:
             tickers: List of asset tickers (e.g., Sector ETFs).
-            benchmark_ticker: Benchmark ticker (e.g., 'ACWI').
+            benchmark_ticker: Benchmark ticker (e.g., 'ACWI', 'SPY').
             start_date: Start date.
             end_date: End date.
             
@@ -49,11 +73,11 @@ class FeaturePipeline:
         
         # 1. Fetch Data
         logger.info("Fetching Asset Data...")
-        assets_df = self.yahoo.fetch_history(tickers, start_date, end_date)
+        assets_df = self.data_collector.fetch_history(tickers, start_date, end_date)
         assets_df = self.processor.process(assets_df)
         
         logger.info("Fetching Benchmark Data...")
-        bench_df = self.yahoo.fetch_history([benchmark_ticker], start_date, end_date)
+        bench_df = self.data_collector.fetch_history([benchmark_ticker], start_date, end_date)
         bench_df = self.processor.process(bench_df)
         
         logger.info("Fetching Macro Data...")
@@ -98,13 +122,15 @@ class FeaturePipeline:
         macro_feats['Date'] = pd.to_datetime(macro_feats['Date'])
         
         # Merge macro (left join to keep asset dates)
-        master_df = pd.merge(master_df, macro_feats, on='Date', how='left')
+        master_df = pd.merge(
+            master_df,
+            macro_feats,
+            on='Date',
+            how='left'
+        )
         
         # Set index back to (Date, Ticker)
         master_df = master_df.set_index(['Date', 'ticker']).sort_index()
         
-        # Forward fill any missing macro data that might have occurred due to date mismatch
-        master_df = master_df.groupby(level='ticker').ffill()
-        
-        logger.info(f"Feature Pipeline Complete. Shape: {master_df.shape}")
+        logger.info(f"Feature pipeline complete. Shape: {master_df.shape}")
         return master_df
