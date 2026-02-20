@@ -50,12 +50,14 @@ BENCHMARK_DICT = {
     },
     'MSCI World': {
         'ohlcv': 'VT-US',
-        'total_return': UnivLimit.MSCI_WORLD,
+        'total_return':'990100' ,
+        'constituents': UnivLimit.MSCI_WORLD,
         'ticker': 'VT'
     },
     'MSCI EAFE': {
         'ohlcv': 'EFA-US',
-        'total_return': UnivLimit.MSCI_EAFE,
+        'total_return': '990300',
+        'constituents': UnivLimit.MSCI_EAFE,
         'ticker': 'EFA'
     },
 }
