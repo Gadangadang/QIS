@@ -9,21 +9,19 @@ from datetime import datetime
 import logging
 
 # FactSet imports (only available in FactSet environment)
-try:
-    from fds.fpe.dates import TimeSeries
-    from fds.fpe.universe import IdentifierUniverse, UnivLimit, ScreeningExpressionUniverse
-    from fds.fpe.screening import Screen
-    from fds.fpe.quant.company import Company
-    FACTSET_AVAILABLE = True
-except ImportError:
-    FACTSET_AVAILABLE = False
-    UnivLimit = None  # Placeholder when not available
+from fds.fpe.dates import TimeSeries
+from fds.fpe.universe import IdentifierUniverse, UnivLimit, ScreeningExpressionUniverse
+from fds.fpe.screening import Screen
+from fds.fpe.quant.company import Company
+FACTSET_AVAILABLE = True
+
 
 logger = logging.getLogger(__name__)
 
 
 # Benchmark Dictionary - Maps common names to FactSet identifiers
-BENCHMARK_DICT = {
+def get_BM_dict():
+    return {
     'S&P 500': {
         'ohlcv': 'SPY-US',           # ETF for OHLCV
         'total_return': 'SP50.R',       # Total return index
@@ -102,6 +100,8 @@ TICKER_TO_SECURITY = {
     'USO': 'USO-US',
     'UNG': 'UNG-US',
 }
+
+BENCHMARK_DICT = get_BM_dict()
 
 
 class FactSetCollector:
