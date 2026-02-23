@@ -220,17 +220,22 @@ class BacktestResult:
             print(f"{'-'*35}")
             if 'Benchmark' in metrics:
                 print(f"{'Benchmark':<25} {metrics['Benchmark']:>12}")
-            print(f"{'Benchmark Return':<25} {metrics['Benchmark Return']:>12.2%}")
-            print(f"{'Relative Return':<25} {metrics['Relative Return']:>12.2%}")
+            if 'Benchmark Return' in metrics:
+                print(f"{'Benchmark Return':<25} {metrics['Benchmark Return']:>12.2%}")
+            if 'Relative Return' in metrics:
+                print(f"{'Relative Return':<25} {metrics['Relative Return']:>12.2%}")
             print(f"{'Beta (Full Period)':<25} {metrics['Beta (Full Period)']:>12.2f}")
             print(f"{'Beta (90-day avg)':<25} {metrics['Beta (90-day avg)']:>12.2f}")
             print(f"{'Beta (1-year avg)':<25} {metrics['Beta (1-year avg)']:>12.2f}")
             print(f"{'Alpha (Annual)':<25} {metrics['Alpha (Annual)']:>12.2%}")
-            print(f"{'Tracking Error':<25} {metrics['Tracking Error']:>12.2%}")
+            if 'Tracking Error' in metrics:
+                print(f"{'Tracking Error':<25} {metrics['Tracking Error']:>12.2%}")
             print(f"{'Information Ratio':<25} {metrics['Information Ratio']:>12.2f}")
             print(f"{'Correlation':<25} {metrics['Correlation']:>12.2f}")
-            print(f"{'Up Capture Ratio':<25} {metrics['Up Capture Ratio']:>12.2f}")
-            print(f"{'Down Capture Ratio':<25} {metrics['Down Capture Ratio']:>12.2f}")
+            if 'Up Capture Ratio' in metrics:
+                print(f"{'Up Capture Ratio':<25} {metrics['Up Capture Ratio']:>12.2f}")
+            if 'Down Capture Ratio' in metrics:
+                print(f"{'Down Capture Ratio':<25} {metrics['Down Capture Ratio']:>12.2f}")
         
         # Trade statistics
         print(f"\n{'TRADE STATISTICS':<35}")

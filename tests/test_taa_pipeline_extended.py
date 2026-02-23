@@ -5,7 +5,6 @@ Tests uncovered functionality in core/taa/features/pipeline.py:
 - End-to-end pipeline orchestration
 - Data fetching and alignment
 - Feature merging logic
-- Macro data broadcasting
 - Edge cases: empty data, missing columns, date misalignment
 """
 
@@ -95,28 +94,6 @@ def mock_benchmark_data():
     return df
 
 
-@pytest.fixture
-def mock_macro_data():
-    """
-    Generate mock macro/FRED data.
-    
-    Returns:
-        pd.DataFrame with macro indicators
-    """
-    dates = pd.date_range('2023-01-01', periods=252, freq='D')
-    
-    np.random.seed(456)
-    df = pd.DataFrame({
-        'T10Y2Y': np.random.uniform(0.5, 2.5, len(dates)),      # Yield curve slope
-        'BAA10Y': np.random.uniform(1.0, 2.5, len(dates)),      # Credit spread
-        'VIXCLS': np.random.uniform(12, 30, len(dates)),        # VIX
-        'CPIAUCSL': 250 + np.cumsum(np.random.uniform(0, 0.05, len(dates)))  # CPI
-    }, index=dates)
-    df.index.name = 'DATE'
-    
-    return df
-
-
 # ============================================================================
 # Basic Initialization and Run Tests
 # ============================================================================
@@ -134,11 +111,9 @@ class TestFeaturePipelineInitialization:
         """
         pipeline = FeaturePipeline()
         
-        assert pipeline.yahoo is not None
-        assert pipeline.fred is not None
+        assert pipeline.data_collector is not None
         assert pipeline.processor is not None
         assert pipeline.price_gen is not None
-        assert pipeline.macro_gen is not None
         assert pipeline.rel_gen is not None
     
     def test_pipeline_components_correct_type(self):
@@ -149,19 +124,16 @@ class TestFeaturePipelineInitialization:
         Act: Get component types
         Assert: Components have expected types
         """
-        from core.data.collectors import YahooCollector, FredCollector
+        from core.data.collectors import YahooCollector
         from core.data.processors import PriceProcessor
         from core.taa.features.price import PriceFeatureGenerator
-        from core.taa.features.macro import MacroFeatureGenerator
         from core.taa.features.relative import RelativeValueFeatureGenerator
         
         pipeline = FeaturePipeline()
         
-        assert isinstance(pipeline.yahoo, YahooCollector)
-        assert isinstance(pipeline.fred, FredCollector)
+        assert isinstance(pipeline.data_collector, YahooCollector)
         assert isinstance(pipeline.processor, PriceProcessor)
         assert isinstance(pipeline.price_gen, PriceFeatureGenerator)
-        assert isinstance(pipeline.macro_gen, MacroFeatureGenerator)
         assert isinstance(pipeline.rel_gen, RelativeValueFeatureGenerator)
 
 
@@ -173,16 +145,13 @@ class TestFeaturePipelineRun:
     """Test end-to-end pipeline execution with mocked data sources."""
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_run_pipeline_basic(
         self, 
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test basic pipeline run with all components mocked.
@@ -193,17 +162,14 @@ class TestFeaturePipelineRun:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         # Configure return values
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Create and run pipeline
         pipeline = FeaturePipeline()
@@ -220,20 +186,16 @@ class TestFeaturePipelineRun:
         
         # Check that data collectors were called
         assert mock_yahoo.fetch_history.call_count == 2  # Assets + benchmark
-        assert mock_fred.fetch_history.call_count == 1
         assert mock_processor.process.call_count == 2
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_run_pipeline_multiindex_output(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test that pipeline output has correct MultiIndex (Date, ticker).
@@ -244,16 +206,13 @@ class TestFeaturePipelineRun:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
@@ -268,36 +227,30 @@ class TestFeaturePipelineRun:
         assert result.index.names == ['Date', 'ticker']
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_run_pipeline_feature_columns_present(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test that expected feature columns are in output.
         
         Arrange: Mock data sources
         Act: Run pipeline
-        Assert: Price, macro, and relative features exist
+        Assert: Price and relative features exist
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
@@ -323,14 +276,11 @@ class TestFeaturePipelineEdgeCases:
     
     @pytest.mark.skip(reason="Edge case: empty data handling needs implementation fix")
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_pipeline_empty_assets_data(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
-        mock_macro_data
     ):
         """
         Test pipeline behavior with empty asset data.
@@ -341,18 +291,15 @@ class TestFeaturePipelineEdgeCases:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         # Return empty DataFrames
         empty_df = pd.DataFrame()
         mock_yahoo.fetch_history.side_effect = [empty_df, empty_df]
         mock_processor.process.side_effect = [empty_df, empty_df]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
@@ -364,18 +311,15 @@ class TestFeaturePipelineEdgeCases:
         )
         
         # Should handle gracefully (may return empty or raise)
-        # Depending on implementation, could be empty or have macro features only
         assert isinstance(result, pd.DataFrame)
     
     @pytest.mark.skip(reason="Edge case: date alignment needs implementation fix")
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_pipeline_misaligned_dates(
         self,
         mock_processor_class,
-        mock_fred_class,
-        mock_yahoo_class
+        mock_yahoo_class,
     ):
         """
         Test pipeline with misaligned dates between assets and macro.
@@ -386,11 +330,9 @@ class TestFeaturePipelineEdgeCases:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         # Asset data: Jan-Dec 2023
@@ -400,12 +342,6 @@ class TestFeaturePipelineEdgeCases:
         }, index=asset_dates)
         asset_data.columns = pd.MultiIndex.from_tuples(asset_data.columns)
         
-        # Macro data: Jun 2022 - Jun 2024 (wider range)
-        macro_dates = pd.date_range('2022-06-01', periods=400, freq='D')
-        macro_data = pd.DataFrame({
-            'VIXCLS': np.random.uniform(12, 30, len(macro_dates))
-        }, index=macro_dates)
-        
         # Benchmark data
         bench_data = pd.DataFrame({
             ('ACWI', 'Close'): 100 + np.random.randn(len(asset_dates))
@@ -414,7 +350,6 @@ class TestFeaturePipelineEdgeCases:
         
         mock_yahoo.fetch_history.side_effect = [asset_data, bench_data]
         mock_processor.process.side_effect = [asset_data, bench_data]
-        mock_fred.fetch_history.return_value = macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
@@ -429,16 +364,13 @@ class TestFeaturePipelineEdgeCases:
         assert isinstance(result, pd.DataFrame)
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_pipeline_single_ticker(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test pipeline with single ticker.
@@ -449,11 +381,9 @@ class TestFeaturePipelineEdgeCases:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         # Single ticker data
@@ -461,7 +391,6 @@ class TestFeaturePipelineEdgeCases:
         
         mock_yahoo.fetch_history.side_effect = [single_ticker_data, mock_benchmark_data]
         mock_processor.process.side_effect = [single_ticker_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
@@ -476,16 +405,13 @@ class TestFeaturePipelineEdgeCases:
         assert not result.empty
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_pipeline_no_end_date(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test pipeline with no end_date (defaults to current).
@@ -496,16 +422,13 @@ class TestFeaturePipelineEdgeCases:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline without end_date
         pipeline = FeaturePipeline()
@@ -527,36 +450,30 @@ class TestFeaturePipelineMerging:
     """Test feature merging logic."""
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
-    def test_macro_data_broadcast_to_tickers(
+    def test_tickers_in_output(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
-        Test that macro features are broadcast to all tickers.
+        Test that result has data for all tickers.
         
         Arrange: Mock multi-ticker data
         Act: Run pipeline
-        Assert: Macro features appear for each ticker
+        Assert: All tickers appear in output
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline with multiple tickers
         pipeline = FeaturePipeline()
@@ -570,58 +487,7 @@ class TestFeaturePipelineMerging:
         # Check that result has data for all tickers
         if isinstance(result.index, pd.MultiIndex):
             tickers_in_result = result.index.get_level_values('ticker').unique()
-            # Should have all tickers (or at least multiple)
             assert len(tickers_in_result) >= 1
-    
-    @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
-    @patch('core.taa.features.pipeline.PriceProcessor')
-    def test_pipeline_ffill_macro_data(
-        self,
-        mock_processor_class,
-        mock_fred_class,
-        mock_yahoo_class,
-        mock_price_data,
-        mock_benchmark_data
-    ):
-        """
-        Test that macro data is forward-filled for alignment.
-        
-        Arrange: Create macro data with gaps
-        Act: Run pipeline
-        Assert: Macro data is forward-filled in output
-        """
-        # Setup mocks
-        mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
-        mock_processor = MagicMock()
-        
-        mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
-        mock_processor_class.return_value = mock_processor
-        
-        # Macro data with NaN gaps
-        dates = pd.date_range('2023-01-01', periods=252, freq='D')
-        macro_with_gaps = pd.DataFrame({
-            'VIXCLS': [20.0, np.nan, np.nan, 22.0] + [np.nan] * 248
-        }, index=dates[:252])
-        macro_with_gaps.index.name = 'DATE'
-        
-        mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = macro_with_gaps
-        
-        # Run pipeline
-        pipeline = FeaturePipeline()
-        result = pipeline.run(
-            tickers=['SPY'],
-            benchmark_ticker='ACWI',
-            start_date='2023-01-01',
-            end_date='2023-12-31'
-        )
-        
-        # Pipeline should forward-fill macro data
-        assert isinstance(result, pd.DataFrame)
 
 
 # ============================================================================
@@ -632,16 +498,13 @@ class TestFeaturePipelineIntegration:
     """Integration-style tests with realistic data flow."""
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_full_pipeline_feature_count(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test that full pipeline generates expected number of features.
@@ -652,16 +515,13 @@ class TestFeaturePipelineIntegration:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
@@ -672,21 +532,17 @@ class TestFeaturePipelineIntegration:
             end_date='2023-12-31'
         )
         
-        # Should have multiple feature columns
-        # Price features (~8) + Macro features (~4+) + Relative features (~4+)
-        assert result.shape[1] >= 10  # At least 10 feature columns
+        # Should have multiple feature columns: Price features + Relative features
+        assert result.shape[1] >= 5
     
     @patch('core.taa.features.pipeline.YahooCollector')
-    @patch('core.taa.features.pipeline.FredCollector')
     @patch('core.taa.features.pipeline.PriceProcessor')
     def test_pipeline_sorted_index(
         self,
         mock_processor_class,
-        mock_fred_class,
         mock_yahoo_class,
         mock_price_data,
         mock_benchmark_data,
-        mock_macro_data
     ):
         """
         Test that output has sorted MultiIndex.
@@ -697,16 +553,13 @@ class TestFeaturePipelineIntegration:
         """
         # Setup mocks
         mock_yahoo = MagicMock()
-        mock_fred = MagicMock()
         mock_processor = MagicMock()
         
         mock_yahoo_class.return_value = mock_yahoo
-        mock_fred_class.return_value = mock_fred
         mock_processor_class.return_value = mock_processor
         
         mock_yahoo.fetch_history.side_effect = [mock_price_data, mock_benchmark_data]
         mock_processor.process.side_effect = [mock_price_data, mock_benchmark_data]
-        mock_fred.fetch_history.return_value = mock_macro_data
         
         # Run pipeline
         pipeline = FeaturePipeline()
