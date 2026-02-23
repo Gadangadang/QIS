@@ -188,6 +188,10 @@ class MultiAssetLoader:
             else:
                 logger.warning(f"CSV not found for {ticker}, trying online source")
         
+        # Reject completely unknown tickers early
+        if ticker not in self.ASSET_FILES and ticker not in self.YFINANCE_SYMBOLS:
+            raise ValueError(f"Unknown ticker: {ticker}")
+
         # Try online source
         if self.use_factset or self.use_yfinance:
             return self._fetch_from_online(ticker, start_date='2015-01-01')
