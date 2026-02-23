@@ -5,9 +5,9 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-Production-grade multi-strategy backtesting framework built in Python. Demonstrates software engineering best practices applied to quantitative finance — modular architecture, comprehensive testing, CI/CD, and realistic cost modeling.
+Production-grade multi-strategy backtesting framework built in Python. Built with the following priciples — modular architecture, comprehensive testing, CI/CD, and realistic cost modeling.
 
-> **Portfolio project** — results are for framework demonstration only, not investment advice.
+> **Portfolio project** — results are for framework demonstration only, not investment advice. It is still a work in progress.
 
 ## Key Highlights
 
