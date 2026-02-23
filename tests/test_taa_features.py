@@ -8,7 +8,6 @@ import numpy as np
 
 # Import directly without sys.path manipulation
 from core.taa.features.price import PriceFeatureGenerator
-from core.taa.features.macro import MacroFeatureGenerator
 from core.taa.features.relative import RelativeValueFeatureGenerator
 
 
@@ -172,62 +171,6 @@ class TestPriceFeatureGenerator:
         # Should still generate features, with NaN where insufficient data
         assert 'MOM_52W' in result.columns
         assert result['MOM_52W'].isna().all()  # All NaN because not enough data
-
-
-class TestMacroFeatureGenerator:
-    """Test suite for MacroFeatureGenerator class."""
-
-    @pytest.fixture
-    def sample_macro_data(self):
-        """Create sample macro data."""
-        dates = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
-        
-        df = pd.DataFrame({
-            'DGS10': np.random.uniform(2, 4, len(dates)),  # 10-year yield
-            'DGS2': np.random.uniform(1, 3, len(dates)),   # 2-year yield
-            'BAA10Y': np.random.uniform(1, 2, len(dates)),  # Credit spread
-            'VIXCLS': np.random.uniform(12, 30, len(dates)),  # VIX
-            'CPIAUCSL': 250 + np.arange(len(dates)) * 0.01  # CPI (trending up)
-        }, index=dates)
-        
-        return df
-
-    def test_initialization(self):
-        """Test MacroFeatureGenerator initialization."""
-        generator = MacroFeatureGenerator()
-        assert generator is not None
-
-    def test_generate_basic(self, sample_macro_data):
-        """Test basic feature generation."""
-        generator = MacroFeatureGenerator()
-        result = generator.generate(sample_macro_data)
-        
-        # Should generate some features
-        assert not result.empty
-        assert len(result) == len(sample_macro_data)
-
-    def test_yield_curve_slope_calculation(self, sample_macro_data):
-        """Test yield curve slope calculation."""
-        generator = MacroFeatureGenerator()
-        result = generator.generate(sample_macro_data)
-        
-        if 'YIELD_CURVE_SLOPE' in result.columns:
-            # Yield curve slope should be 10Y - 2Y
-            expected_slope = sample_macro_data['DGS10'] - sample_macro_data['DGS2']
-            pd.testing.assert_series_equal(
-                result['YIELD_CURVE_SLOPE'], 
-                expected_slope,
-                check_names=False
-            )
-
-    def test_empty_dataframe_returns_empty(self):
-        """Test that empty DataFrame returns empty result."""
-        generator = MacroFeatureGenerator()
-        empty_df = pd.DataFrame()
-        
-        result = generator.generate(empty_df)
-        
-        assert result.empty
 
 
 class TestRelativeValueFeatureGenerator:

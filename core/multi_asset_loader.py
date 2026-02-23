@@ -3,7 +3,7 @@ Multi-asset data loader with FactSet support.
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 import pandas as pd
 from datetime import datetime
 import logging
@@ -198,5 +198,56 @@ class MultiAssetLoader:
         """Load data from CSV file."""
         # Implementation same as before...
         pass
-    
-    # ... rest of the methods remain the same
+
+    def load_assets(
+        self,
+        tickers: List[str],
+        start_date: str = '2015-01-01',
+        end_date: Optional[str] = None
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Load price data for multiple assets.
+
+        Args:
+            tickers: List of asset tickers (ES, NQ, GC, CL, NG, etc.)
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD), defaults to today
+
+        Returns:
+            Dict mapping ticker -> DataFrame with price data
+        """
+        result: Dict[str, pd.DataFrame] = {}
+        for ticker in tickers:
+            try:
+                if self.use_factset or self.use_yfinance:
+                    df = self._fetch_from_online(ticker, start_date=start_date, end_date=end_date)
+                else:
+                    df = self.load_single_asset(ticker)
+                result[ticker] = df
+            except Exception as e:
+                logger.warning(f"Failed to load data for {ticker}: {e}")
+        return result
+
+
+def load_assets(
+    tickers: List[str],
+    start_date: str = '2015-01-01',
+    end_date: Optional[str] = None,
+    use_yfinance: bool = True,
+    use_factset: bool = False
+) -> Dict[str, pd.DataFrame]:
+    """
+    Convenience function to load price data for multiple assets.
+
+    Args:
+        tickers: List of asset tickers
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD), defaults to today
+        use_yfinance: If True, fetch data from yfinance
+        use_factset: If True and available, use FactSet instead of yfinance
+
+    Returns:
+        Dict mapping ticker -> DataFrame with price data
+    """
+    loader = MultiAssetLoader(use_yfinance=use_yfinance, use_factset=use_factset)
+    return loader.load_assets(tickers, start_date=start_date, end_date=end_date)
