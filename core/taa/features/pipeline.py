@@ -6,6 +6,8 @@ Orchestrates data collection, alignment, and feature generation.
 import pandas as pd
 import logging
 from typing import List, Dict, Optional
+import os, sys
+sys.path.append(os.path.abspath('../../'))
 
 # Import both collectors
 from core.data.collectors import (
@@ -32,7 +34,8 @@ class FeaturePipeline:
             use_factset: If True and available, use FactSet instead of Yahoo
         """
         # Choose data source
-        if use_factset and FACTSET_AVAILABLE:
+        print(FACTSET_AVAILABLE)
+        if use_factset:
             logger.info("Using FactSet data collector")
             self.data_collector = FactSetCollector()
             self.use_factset = True
@@ -69,23 +72,33 @@ class FeaturePipeline:
         
         # 1. Fetch Data
         logger.info("Fetching Asset Data...")
+        print("Loading Assets")
         assets_df = self.data_collector.fetch_history(tickers, start_date, end_date)
         assets_df = self.processor.process(assets_df)
-        
+        self.assets_df = assets_df
+
+
+        print("Loading Benchmark...")
         logger.info("Fetching Benchmark Data...")
         bench_df = self.data_collector.fetch_history([benchmark_ticker], start_date, end_date)
         bench_df = self.processor.process(bench_df)
+        self.bench_df = bench_df
         
-        # 2. Generate Features
+    def gen_feats(self, assets_df, bench_df):    # 2. Generate Features
         logger.info("Generating Price Features...")
         price_feats = self.price_gen.generate(assets_df)
+        self.price_feats = price_feats
         
         logger.info("Generating Relative Features...")
         rel_feats = self.rel_gen.generate(assets_df, benchmark=bench_df)
+        self.rel_feats = rel_feats
         
         # 3. Merge Everything
         logger.info("Merging Features...")
+        self.dfs_ = [price_feats, rel_feats]
         
+    def merge(self, dfs):
+        price_feats, rel_feats = dfs
         master_df = pd.merge(
             price_feats, 
             rel_feats, 

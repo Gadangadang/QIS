@@ -31,34 +31,47 @@ class PriceFeatureGenerator(BaseFeatureGenerator):
         """
         # Handle MultiIndex (Ticker, Price) from yfinance with group_by='ticker'
         if isinstance(data.columns, pd.MultiIndex):
-            # Assuming level 0 is Ticker and level 1 is Price
-            # We want to iterate over tickers
             features_list = []
-            tickers = data.columns.get_level_values(0).unique()
+            
+            # Determine which level contains the Tickers
+            # yfinance typically puts Tickers at level 0 if group_by='ticker'
+            # but level 1 if you downloaded multiple assets without that flag.
+            ticker_level = 0 
+            if 'Close' in data.columns.get_level_values(0):
+                ticker_level = 1 # Tickers are actually in level 1
+                
+            tickers = data.columns.get_level_values(ticker_level).unique()
             
             for ticker in tickers:
-                # Extract single ticker data
-                # xs returns a DataFrame with Date index and Price columns
-                df_ticker = data.xs(ticker, axis=1, level=0).copy()
-                
-                # Generate features for this ticker
-                df_features = self._generate_single_ticker(df_ticker)
-                
-                # Add Ticker column for later alignment or MultiIndex reconstruction
-                df_features['ticker'] = ticker
-                features_list.append(df_features)
-                
+                try:
+                    # Use .xs with the correct level we just found
+                    df_ticker = data.xs(ticker, axis=1, level=ticker_level).copy()
+                    
+                    # Double check the ticker data isn't empty
+                    if df_ticker.empty:
+                        continue
+                        
+                    df_features = self._generate_single_ticker(df_ticker)
+                    
+                    # Only append if features were actually created
+                    if df_features is not None and not df_features.empty:
+                        df_features['ticker'] = ticker
+                        features_list.append(df_features)
+                except Exception as e:
+                    print(f"Error processing {ticker}: {e}")
+                    continue
+                    
             # Combine all tickers
             if not features_list:
                 return pd.DataFrame()
                 
             combined_features = pd.concat(features_list)
             
-            # Pivot to have Ticker as columns or keep long format?
-            # For ML, long format (Date, Ticker) index is usually better.
-            # Let's set index to (Date, Ticker)
-            combined_features.index.name = 'Date'
-            combined_features = combined_features.reset_index().set_index(['Date', 'ticker']).sort_index()
+            current_index_name = combined_features.index.name or 'date'
+            
+            # Reset index and set the new MultiIndex (using the actual name found)
+            combined_features = combined_features.reset_index()
+            combined_features = combined_features.set_index([current_index_name, 'ticker']).sort_index()
             
             return combined_features
             
@@ -74,11 +87,14 @@ class PriceFeatureGenerator(BaseFeatureGenerator):
         if 'Close' not in df.columns:
             return pd.DataFrame()
             
+        # FIX: Ensure 'close' is a Series, even if df['Close'] returns a DataFrame
         close = df['Close']
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0] # Take the first 'Close' column
+        
         feats = pd.DataFrame(index=df.index)
         
-        # 1. Momentum (Returns)
-        # 1 week = 5 trading days
+        # Now pct_change will return a Series, matching the column 'MOM_1W'
         feats['MOM_1W'] = close.pct_change(5)
         feats['MOM_4W'] = close.pct_change(20)
         feats['MOM_12W'] = close.pct_change(60)

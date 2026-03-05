@@ -167,6 +167,7 @@ class FactSetCollector:
         tickers: List[str], 
         start_date: Union[str, datetime], 
         end_date: Optional[Union[str, datetime]] = None,
+        benchmark_pull = False,
         interval: str = "1d"
     ) -> pd.DataFrame:
         """
@@ -204,7 +205,10 @@ class FactSetCollector:
         ]
         
         # Use fetch with ohlcv type
-        df = self.fetch(factset_securities, 'ohlcv', start_date, end_date)
+        if benchmark_pull:
+            df = fetch_benchmark_total_return(factset_securities, start_date,end_date)
+        else:
+            df = self.fetch(factset_securities, 'ohlcv', start_date, end_date)
         
         # Map FactSet symbols back to original tickers
         if not df.empty and isinstance(df.columns, pd.MultiIndex):
@@ -280,6 +284,59 @@ class FactSetCollector:
         except Exception as e:
             logger.error(f"Error fetching OHLCV data from FactSet: {e}")
             raise
+
+    def fetch_benchmark_total_return(
+        self,
+        benchmarks: list[str],
+        start_date: str,
+        end_date: str,
+        freq: str = 'D'  # 'D' for daily, 'M' for monthly, etc.
+        ) -> pd.DataFrame:
+        """
+        Fetch total return index values for benchmark indices.
+    
+        Returns:
+            DataFrame with MultiIndex columns (Security, 'TotalReturn')
+        """
+        
+        # Create time series
+        ts = TimeSeries(
+            start=start_date.replace('-', ''),
+            stop=end_date.replace('-', ''),
+            freq=freq
+        )
+
+        # Create universe
+        univ = IdentifierUniverse(benchmarks, time_series=ts)
+
+        # FactSet formula for total return index value
+        formulas = ['P_INDEX_TOT_RETURN(0,USD)']
+        columns = ['TotalReturn']
+
+        # Fetch data
+        screen = Screen(universe=univ, formulas=formulas, columns=columns)
+        screen.calculate()
+        df = screen.data.reset_index()
+        print(df)
+        if df.empty:
+            logger.warning("FactSet returned empty DataFrame for benchmark total return")
+            return df
+
+        # Format date
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date')
+
+        # Pivot to MultiIndex columns: (Security, 'TotalReturn')
+        df = df.pivot_table(index='date', columns='symbol', values=columns)
+
+        # Reorder MultiIndex: (Security, PriceType)
+        df = df.swaplevel(axis=1).sort_index(axis=1, level=0)
+
+        # Remove timezone if present
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+
+        return df
     
     def _fetch_total_return(
         self,
@@ -457,3 +514,14 @@ def fetch_benchmark(
     identifier = info[data_type]
     
     return collector.fetch(identifier, data_type, start_date, end_date, fields)
+
+
+
+if __name__ == "__main__":
+    start_date='2014-01-01'
+    end_date='2024-12-31'
+    collector = FactSetCollector()
+    benchmark = '892400'
+
+    bench_df = collector.fetch_history([benchmark], start_date, end_date)
+    print(bench_df)
